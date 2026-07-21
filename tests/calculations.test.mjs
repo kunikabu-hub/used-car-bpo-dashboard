@@ -51,6 +51,13 @@ test("一宮はリチェック70台・1枠で計算する", () => {
   assert.ok(Math.abs(result.recheckRevenue - expected) < 0.01);
 });
 
+test("5店舗のMAX展示数を反映する", () => {
+  assert.deepEqual(
+    Object.fromEntries(stores.map((store) => [store.id, store.displayInventory])),
+    { hachioji: 200, ichinomiya: 300, shinsayama: 200, omiya: 150, soka: 250 },
+  );
+});
+
 test("追加5店舗の初期投資とNaS用具費を計算する", () => {
   const result = calculateExpansionSimulation({ ...defaultExpansionInputs, storeCount: 5 }, settings);
   assert.equal(result.starterKitInvestment, 3000000);
