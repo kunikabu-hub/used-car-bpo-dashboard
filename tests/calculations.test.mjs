@@ -4,6 +4,7 @@ import {
   calculateCashFlow,
   calculateExpansionSimulation,
   calculateDirectPhotoStaffCost,
+  calculatePhotoContractRevenue,
   calculateRecheckRevenue,
   calculateStoreSimulation,
   summarizeCashFlow,
@@ -46,18 +47,23 @@ test("八王子は実績固定値を優先する", () => {
   assert.equal(result.nasRevenue, 0);
 });
 
-test("一宮はリチェック70台・1枠で計算する", () => {
+test("一宮はリチェックなし、撮影150台を75台分へ換算する", () => {
   const result = calculateStoreSimulation(stores[1], settings);
-  const expected = 370000 - (100 - 52.5) * 3083.333333;
-  assert.ok(Math.abs(result.recheckRevenue - expected) < 0.01);
+  assert.equal(stores[1].recheckCount, 0);
+  assert.equal(stores[1].recheckSlots, 0);
+  assert.equal(result.recheckRevenue, 0);
+  assert.equal(calculatePhotoContractRevenue(stores[1], settings), 292925);
+  assert.equal(result.photoContractRevenue, 292925);
 });
 
-test("一宮は仕上げ180台・撮影100台、撮影専任報酬23万円で計算する", () => {
+test("一宮は仕上げ180台・撮影150台、撮影専任報酬17万円で計算する", () => {
   const result = calculateStoreSimulation(stores[1], settings);
   assert.equal(stores[1].finishingCount, 180);
-  assert.equal(stores[1].photoCount, 100);
-  assert.equal(calculateDirectPhotoStaffCost(stores[1]), 230000);
-  assert.equal(result.attaDirectCost, 1141186);
+  assert.equal(stores[1].photoCount, 150);
+  assert.equal(calculateDirectPhotoStaffCost(stores[1]), 170000);
+  assert.equal(result.attaRevenue, 2094890);
+  assert.equal(result.attaDirectCost, 941186);
+  assert.equal(result.attaGrossProfit, 1153704);
 });
 
 test("5店舗のMAX展示数を反映する", () => {

@@ -43,7 +43,7 @@ function mixCounts(store: Store) {
 export function calculateAttaRevenue(store: Store, settings: SimulationSettings) {
   if (store.actualMonthlyRevenue != null) return store.actualMonthlyRevenue;
   const { simple, normal, dirty } = mixCounts(store);
-  const photoBundledNormal = Math.min(normal, store.photoCount);
+  const photoBundledNormal = store.billPhotoAsFinishingBundle === false ? 0 : Math.min(normal, store.photoCount);
   const normalWithoutPhoto = Math.max(0, normal - photoBundledNormal);
   const finishingRevenue =
     simple * settings.pricing.client.simpleFinishing +
@@ -59,7 +59,23 @@ export function calculateAttaRevenue(store: Store, settings: SimulationSettings)
     settings.pricing.client,
     taxMultiplier,
   );
-  return finishingRevenue + washRevenue + recheckRevenue;
+  const photoContractRevenue = calculatePhotoContractRevenue(store, settings);
+  return finishingRevenue + washRevenue + recheckRevenue + photoContractRevenue;
+}
+
+export function calculatePhotoContractRevenue(store: Store, settings: SimulationSettings) {
+  if (!store.photoContractConversionRate || store.photoCount <= 0) return 0;
+  return calculateRecheckRevenue(
+    store.photoCount,
+    1,
+    store.photoContractConversionRate,
+    {
+      ...settings.pricing.client,
+      recheckAdjustmentUnitPrice:
+        store.photoContractAdjustmentUnitPrice ?? settings.pricing.client.recheckAdjustmentUnitPrice,
+    },
+    settings.taxMode === "taxIncluded" ? 1 + settings.taxRate : 1,
+  );
 }
 
 export function calculateNasRevenue(store: Store, pricing: Pricing) {
@@ -127,7 +143,7 @@ export function calculateNasGrossProfit(store: Store, pricing: Pricing) {
 
 export function calculateStoreSimulation(store: Store, settings: SimulationSettings): StoreFinancials {
   const { simple, normal, dirty } = mixCounts(store);
-  const photoBundledNormal = Math.min(normal, store.photoCount);
+  const photoBundledNormal = store.billPhotoAsFinishingBundle === false ? 0 : Math.min(normal, store.photoCount);
   const finishingRevenue = store.actualMonthlyRevenue != null
     ? 0
     : simple * settings.pricing.client.simpleFinishing +
@@ -143,6 +159,7 @@ export function calculateStoreSimulation(store: Store, settings: SimulationSetti
     settings.pricing.client,
     taxMultiplier,
   );
+  const photoContractRevenue = store.actualMonthlyRevenue != null ? 0 : calculatePhotoContractRevenue(store, settings);
   const attaRevenue = calculateAttaRevenue(store, settings);
   const attaDirectCost = calculateAttaDirectCost(store, settings.pricing);
   const directPhotoStaffCost = calculateDirectPhotoStaffCost(store);
@@ -157,6 +174,7 @@ export function calculateStoreSimulation(store: Store, settings: SimulationSetti
     finishingRevenue,
     washRevenue,
     recheckRevenue,
+    photoContractRevenue,
     attaRevenue,
     attaDirectCost,
     directPhotoStaffCost,

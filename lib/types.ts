@@ -20,6 +20,9 @@ export type Store = {
   dirtyFinishingCount?: number;
   washCount: number;
   photoCount: number;
+  billPhotoAsFinishingBundle?: boolean;
+  photoContractConversionRate?: number;
+  photoContractAdjustmentUnitPrice?: number;
   recheckCount: number;
   recheckWorkers: number;
   recheckSlots: number;
@@ -90,6 +93,7 @@ export type StoreFinancials = {
   finishingRevenue: number;
   washRevenue: number;
   recheckRevenue: number;
+  photoContractRevenue: number;
   attaRevenue: number;
   attaDirectCost: number;
   directPhotoStaffCost: number;
