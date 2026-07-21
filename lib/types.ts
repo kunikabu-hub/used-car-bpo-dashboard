@@ -26,6 +26,9 @@ export type Store = {
   actualMonthlyRevenue?: number;
   actualDirectCost?: number;
   directFinishingCostPerUnit?: number;
+  directPhotoConversionRate?: number;
+  directPhotoBaseActualUnits?: number;
+  directPhotoBaseCompensation?: number;
   directWashCostPerUnit?: number;
   directRecheckCostPerUnit?: number;
   starterKitInstalled: boolean;
@@ -89,6 +92,7 @@ export type StoreFinancials = {
   recheckRevenue: number;
   attaRevenue: number;
   attaDirectCost: number;
+  directPhotoStaffCost: number;
   attaGrossProfit: number;
   attaGrossMargin: number;
   nasRevenue: number;

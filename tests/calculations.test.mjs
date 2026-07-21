@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   calculateCashFlow,
   calculateExpansionSimulation,
+  calculateDirectPhotoStaffCost,
   calculateRecheckRevenue,
   calculateStoreSimulation,
   summarizeCashFlow,
@@ -49,6 +50,14 @@ test("一宮はリチェック70台・1枠で計算する", () => {
   const result = calculateStoreSimulation(stores[1], settings);
   const expected = 370000 - (100 - 52.5) * 3083.333333;
   assert.ok(Math.abs(result.recheckRevenue - expected) < 0.01);
+});
+
+test("一宮は仕上げ180台・撮影100台、撮影専任報酬23万円で計算する", () => {
+  const result = calculateStoreSimulation(stores[1], settings);
+  assert.equal(stores[1].finishingCount, 180);
+  assert.equal(stores[1].photoCount, 100);
+  assert.equal(calculateDirectPhotoStaffCost(stores[1]), 230000);
+  assert.equal(result.attaDirectCost, 1141186);
 });
 
 test("5店舗のMAX展示数を反映する", () => {

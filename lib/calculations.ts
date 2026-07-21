@@ -83,11 +83,25 @@ export function calculateAttaDirectCost(store: Store, pricing: Pricing) {
     simple * (store.directFinishingCostPerUnit ?? pricing.attaToNas.simpleFinishing) +
     normal * (store.directFinishingCostPerUnit ?? pricing.attaToNas.normalFinishing) +
     dirty * (store.directFinishingCostPerUnit ?? pricing.attaToNas.dirtyFinishing);
+  const photoStaffCost = calculateDirectPhotoStaffCost(store);
   return (
     finishingCost +
+    photoStaffCost +
     store.washCount * (store.directWashCostPerUnit ?? pricing.attaToNas.wash) +
     store.recheckCount * (store.directRecheckCostPerUnit ?? pricing.attaToNas.recheck)
   );
+}
+
+export function calculateDirectPhotoStaffCost(store: Store) {
+  if (
+    store.managedByNas ||
+    !store.directPhotoConversionRate ||
+    !store.directPhotoBaseActualUnits ||
+    !store.directPhotoBaseCompensation
+  ) return 0;
+  const convertedUnits = store.photoCount * store.directPhotoConversionRate;
+  const baseConvertedUnits = store.directPhotoBaseActualUnits * store.directPhotoConversionRate;
+  return convertedUnits * (store.directPhotoBaseCompensation / baseConvertedUnits);
 }
 
 export function calculateAttaGrossProfit(store: Store, settings: SimulationSettings) {
@@ -131,6 +145,7 @@ export function calculateStoreSimulation(store: Store, settings: SimulationSetti
   );
   const attaRevenue = calculateAttaRevenue(store, settings);
   const attaDirectCost = calculateAttaDirectCost(store, settings.pricing);
+  const directPhotoStaffCost = calculateDirectPhotoStaffCost(store);
   const attaGrossProfit = attaRevenue - attaDirectCost;
   const nasRevenue = calculateNasRevenue(store, settings.pricing);
   const nasStaffCost = calculateNasStaffCost(store, settings.pricing);
@@ -144,6 +159,7 @@ export function calculateStoreSimulation(store: Store, settings: SimulationSetti
     recheckRevenue,
     attaRevenue,
     attaDirectCost,
+    directPhotoStaffCost,
     attaGrossProfit,
     attaGrossMargin: safeDivide(attaGrossProfit, attaRevenue),
     nasRevenue,
