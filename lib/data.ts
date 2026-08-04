@@ -167,15 +167,15 @@ export const stores: Store[] = [
     finishingCount: 150,
     normalFinishingCount: 150,
     washCount: 300,
-    photoCount: 150,
+    photoCount: 0,
     recheckCount: 70,
     recheckWorkers: 1,
     recheckSlots: 1,
     starterKitInstalled: false,
     starterKitCost: 600_000,
     openingMonth: "開設月調整中",
-    notes: ["新規依頼店舗", "NaS管理対象", "展示在庫150台想定", "業務量は平均150台店舗モデルで仮置き"],
-    opportunities: ["開設月と稼働開始条件の確定", "実績取得後の処理台数・人員・枠数更新"],
+    notes: ["新規依頼店舗", "NaS管理対象", "展示在庫150台想定", "当面は撮影業務なし", "仕上げ・水洗い・リチェックは平均150台店舗モデルで仮置き"],
+    opportunities: ["開設月と稼働開始条件の確定", "撮影業務の開始時期を別途判断", "実績取得後の処理台数・人員・枠数更新"],
   },
 ];
 

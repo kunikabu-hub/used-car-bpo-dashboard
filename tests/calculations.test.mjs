@@ -84,14 +84,15 @@ test("NaSは草加・大宮・つくば、新狭山はLIVE COLOR管理", () => {
   assert.equal(calculateStoreSimulation(shinsayama, settings).nasSupplyCost, 0);
 });
 
-test("つくばは展示150台のNaS管理標準モデル", () => {
+test("つくばは展示150台のNaS管理、当面は撮影なし", () => {
   const tsukuba = stores.find((store) => store.id === "tsukuba");
   const result = calculateStoreSimulation(tsukuba, settings);
   assert.equal(tsukuba?.displayInventory, 150);
   assert.equal(tsukuba?.finishingCount, 150);
+  assert.equal(tsukuba?.photoCount, 0);
   assert.equal(tsukuba?.starterKitInstalled, false);
-  assert.equal(result.nasRevenue, 1055000);
-  assert.equal(result.nasStaffCost, 725000);
+  assert.equal(result.nasRevenue, 905000);
+  assert.equal(result.nasStaffCost, 575000);
   assert.equal(result.nasSupplyCost, 30000);
   assert.equal(result.nasContributionProfit, 300000);
 });
