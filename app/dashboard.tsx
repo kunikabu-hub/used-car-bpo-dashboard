@@ -10,6 +10,7 @@ import {
   summarizeCashFlow,
 } from "../lib/calculations";
 import { defaultExpansionInputs, operatingCostSettings, pricing, stores } from "../lib/data";
+import { july2026Actual, july2026Summary } from "../lib/actuals";
 import type {
   DeploymentMode,
   ExpansionInputs,
@@ -21,7 +22,7 @@ import type {
   TaxMode,
 } from "../lib/types";
 
-type Tab = "summary" | "stores" | "cashflow" | "simulator" | "settings";
+type Tab = "summary" | "actuals" | "stores" | "cashflow" | "simulator" | "settings";
 
 const yen = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 });
 const number = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 });
@@ -33,6 +34,7 @@ const managementDescription = (store: Store) => store.managementPartner === "nas
 
 const navItems: Array<{ id: Tab; label: string; icon: string }> = [
   { id: "summary", label: "サマリー", icon: "◫" },
+  { id: "actuals", label: "7月実績", icon: "●" },
   { id: "stores", label: "店舗別", icon: "▦" },
   { id: "cashflow", label: "キャッシュフロー", icon: "↗" },
   { id: "simulator", label: "店舗追加", icon: "＋" },
@@ -252,6 +254,14 @@ export default function Dashboard() {
                 <div><span>NaS年間用具費（既存）</span><strong>{yen.format(totals.nasSupply * 12)}</strong></div>
               </section>
 
+              <section className="actual-summary-banner">
+                <div className="actual-summary-heading"><span>2026年7月 確定実績</span><strong>稼働率80%時点の粗利を確認</strong><button onClick={() => setTab("actuals")}>実績詳細を見る →</button></div>
+                <div><span>税抜売上</span><strong>{yen.format(july2026Actual.revenue)}</strong></div>
+                <div><span>直接粗利</span><strong>{yen.format(july2026Summary.grossProfit)}</strong></div>
+                <div><span>直接粗利率</span><strong>{percent.format(july2026Summary.grossMargin)}</strong></div>
+                <div><span>備品費控除後</span><strong>{yen.format(july2026Summary.contributionProfit)}</strong></div>
+              </section>
+
               <SectionTitle eyebrow="NEW STORE ECONOMICS" title={`追加${inputs.storeCount}店舗の投資・回収見通し`} action={<button className="text-button" onClick={() => setTab("simulator")}>条件を変更 →</button>} />
               <section className="metric-grid secondary-metrics">
                 <MetricCard label="スターターキット投資額" value={yen.format(expansion.starterKitInvestment)} helper={`1店舗 ${yen.format(settings.operatingCosts.attaStarterKitCostPerStore)}`} tone="amber" />
@@ -299,6 +309,7 @@ export default function Dashboard() {
             </>
           ) : null}
 
+          {tab === "actuals" ? <ActualsView /> : null}
           {tab === "stores" ? <StoresView financials={financials} selected={selectedFinancial} setSelected={setSelectedStore} settings={settings} /> : null}
           {tab === "cashflow" ? <CashFlowView months={cashMonths} setMonths={setCashMonths} mode={deploymentMode} setMode={setDeploymentMode} flow={cashFlow} simultaneous={simultaneous} phased={phased} simSummary={simSummary} phasedSummary={phasedSummary} investment={expansion.starterKitInvestment} /> : null}
           {tab === "simulator" ? <SimulatorView inputs={inputs} updateInputs={updateInputs} expansion={expansion} settings={settings} setSettings={setSettings} /> : null}
@@ -307,6 +318,38 @@ export default function Dashboard() {
       </main>
     </div>
   );
+}
+
+function ActualsView() {
+  return <>
+    <section className="actual-hero">
+      <div><span className="eyebrow">JULY 2026 ACTUAL</span><h1>7月実績</h1><p>請求データと業務委託費の店舗配賦を税抜で集計。予測モデルとは分離して表示しています。</p></div>
+      <div className="utilization-ring"><strong>{percent.format(july2026Actual.utilizationRate)}</strong><span>推定稼働率</span></div>
+    </section>
+
+    <section className="metric-grid primary-metrics">
+      <MetricCard label="7月売上" value={yen.format(july2026Actual.revenue)} helper={`100%稼働換算 ${yen.format(july2026Summary.fullCapacityRevenue)}`} formula="伝票・撮影／リチェック・水洗い請求の税抜売上合計" />
+      <MetricCard label="店舗別業務委託費" value={yen.format(july2026Actual.storeOutsourcingCost)} helper="上荒磯リチェック268,000円を含む" tone="amber" />
+      <MetricCard label="直接粗利" value={yen.format(july2026Summary.grossProfit)} helper={`粗利率 ${percent.format(july2026Summary.grossMargin)}`} tone="blue" formula="売上 − 店舗別業務委託費" />
+      <MetricCard label="備品費控除後利益" value={yen.format(july2026Summary.contributionProfit)} helper={`利益率 ${percent.format(july2026Summary.contributionProfit / july2026Actual.revenue)}`} tone="green" formula="直接粗利 − 高橋共通費 − 東日本ライティング備品費（税抜換算）" />
+    </section>
+
+    <section className="actual-cost-strip">
+      <div><span>高橋 備品・共通費</span><strong>{yen.format(july2026Actual.commonEquipmentCost)}</strong><small>税抜</small></div>
+      <div><span>東日本ライティング</span><strong>{yen.format(july2026Actual.lightingEquipmentCostTaxIncluded)}</strong><small>税込／税抜換算 {yen.format(july2026Actual.lightingEquipmentCostTaxExclusive)}</small></div>
+      <div><span>備品費合計</span><strong>{yen.format(july2026Summary.equipmentCost)}</strong><small>粗利後に控除・税抜換算</small></div>
+      <div><span>未稼働20%の売上余地</span><strong>{yen.format(july2026Summary.fullCapacityRevenue - july2026Actual.revenue)}</strong><small>80%稼働の単純換算</small></div>
+    </section>
+
+    <section className="panel table-panel"><SectionTitle eyebrow="STORE ACTUAL" title="店舗別 7月売上・業務委託費" /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>売上（税抜）</th><th>業務委託費（税抜）</th><th>直接粗利</th><th>粗利率</th><th>確認状況</th></tr></thead><tbody>{july2026Actual.stores.map((store) => { const gross = store.revenue - store.outsourcingCost; return <tr key={store.id}><td>{store.name}</td><td>{yen.format(store.revenue)}</td><td>{yen.format(store.outsourcingCost)}</td><td className={gross < 0 ? "negative-text" : ""}>{yen.format(gross)}</td><td className={gross < 0 ? "negative-text" : ""}>{percent.format(store.revenue ? gross / store.revenue : 0)}</td><td>{store.costStatus === "unallocated" ? <span className="pending-badge">原価未配賦</span> : <span className="confirmed-badge">配賦済み</span>}</td></tr>; })}</tbody><tfoot><tr><td>合計</td><td>{yen.format(july2026Actual.revenue)}</td><td>{yen.format(july2026Actual.storeOutsourcingCost)}</td><td>{yen.format(july2026Summary.grossProfit)}</td><td>{percent.format(july2026Summary.grossMargin)}</td><td>—</td></tr></tfoot></table></div><p className="panel-note">所沢は売上伝票がありますが、今回共有された店舗別業務委託費に配賦がないため原価未配賦と表示しています。つくばは7月実績なしです。</p></section>
+
+    <div className="two-column actual-detail-columns">
+      <section className="panel"><SectionTitle eyebrow="STORE PROFIT" title="店舗別 売上と直接粗利" /><div className="legend"><span><i className="legend-blue" />売上</span><span><i className="legend-amber" />直接粗利</span></div><BarComparison rows={july2026Actual.stores.map((store) => ({ label: store.name, primary: store.revenue, secondary: store.revenue - store.outsourcingCost }))} /></section>
+      <section className="panel"><SectionTitle eyebrow="COST ALLOCATION" title="委託先・店舗別内訳" /><div className="allocation-list">{july2026Actual.allocations.map((item, index) => <div key={`${item.store}-${item.contractor}-${index}`}><span><strong>{item.store}</strong>{item.contractor}<small>{item.work}</small></span><b>{yen.format(item.amount)}</b></div>)}</div></section>
+    </div>
+
+    <section className="actual-note"><strong>集計上の扱い</strong><span>売上・店舗委託費は税抜。高橋の総額266,000円のうち190,000円を店舗費、76,000円を備品・共通費に分類。新狭山にはLIVE COLOR 593,000円と上荒磯リチェック268,000円を計上しています。</span></section>
+  </>;
 }
 
 function StoresView({ financials, selected, setSelected, settings }: { financials: StoreFinancials[]; selected: StoreFinancials; setSelected: (id: string) => void; settings: SimulationSettings }) {

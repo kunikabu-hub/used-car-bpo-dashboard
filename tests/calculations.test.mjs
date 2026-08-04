@@ -10,6 +10,7 @@ import {
   summarizeCashFlow,
 } from "../lib/calculations.ts";
 import { defaultExpansionInputs, operatingCostSettings, pricing, stores } from "../lib/data.ts";
+import { july2026Actual, july2026Summary } from "../lib/actuals.ts";
 
 const settings = {
   taxMode: "taxExclusive",
@@ -118,4 +119,14 @@ test("一括展開と段階展開の開設月を分ける", () => {
   assert.deepEqual(phased.map((row) => row.newStores), [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0]);
   assert.equal(summarizeCashFlow(simultaneous).maximumCashOutflow, 1800000);
   assert.equal(summarizeCashFlow(phased).maximumCashOutflow, 600000);
+});
+
+test("2026年7月実績の売上・委託費・粗利率を集計する", () => {
+  assert.equal(july2026Actual.stores.reduce((sum, store) => sum + store.revenue, 0), 4_910_637);
+  assert.equal(july2026Actual.stores.reduce((sum, store) => sum + store.outsourcingCost, 0), 3_107_036);
+  assert.equal(july2026Actual.allocations.reduce((sum, item) => sum + item.amount, 0), 3_107_036);
+  assert.equal(july2026Summary.grossProfit, 1_803_601);
+  assert.ok(Math.abs(july2026Summary.grossMargin - 0.36728452948161305) < 1e-12);
+  assert.equal(july2026Summary.equipmentCost, 176_301);
+  assert.equal(july2026Summary.contributionProfit, 1_627_300);
 });

@@ -18,5 +18,7 @@ test("管理ダッシュボードをサーバー描画する", async () => {
   assert.match(html, /収益と投資を、同じ画面で判断する/);
   assert.match(html, /スターターキット投資額/);
   assert.match(html, /NaS用具費控除後利益/);
+  assert.match(html, /2026年7月 確定実績/);
+  assert.match(html, /直接粗利率/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
