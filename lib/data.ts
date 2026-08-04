@@ -107,10 +107,12 @@ export const stores: Store[] = [
     recheckCount: 180,
     recheckWorkers: 2,
     recheckSlots: 2,
+    directFinishingCostPerUnit: 5_500,
+    directRecheckCostPerUnit: 2_500,
     starterKitInstalled: true,
     starterKitCost: 600_000,
     openingMonth: "既存店（支出済み）",
-    notes: ["LIVE COLOR管理対象", "月180台・リチェック2枠の想定"],
+    notes: ["LIVE COLOR管理対象", "仕上げ業務委託費5,500円（税込）／台", "リチェック業務委託費2,500円／台", "月180台・リチェック2枠の想定"],
     opportunities: ["LIVE COLORとの管理条件を実績で検証", "枠別稼働率の平準化", "実績取得後の単価・台数更新"],
   },
   {

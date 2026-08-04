@@ -81,7 +81,11 @@ test("NaSは草加・大宮・つくば、新狭山はLIVE COLOR管理", () => {
   const shinsayama = stores.find((store) => store.id === "shinsayama");
   assert.equal(shinsayama?.managedByNas, false);
   assert.equal(shinsayama?.managementPartner, "liveColor");
-  assert.equal(calculateStoreSimulation(shinsayama, settings).nasSupplyCost, 0);
+  const result = calculateStoreSimulation(shinsayama, settings);
+  assert.equal(shinsayama?.directFinishingCostPerUnit, 5500);
+  assert.equal(shinsayama?.directRecheckCostPerUnit, 2500);
+  assert.equal(result.attaDirectCost, 1728000);
+  assert.equal(result.nasSupplyCost, 0);
 });
 
 test("つくばは展示150台のNaS管理、当面は撮影なし", () => {

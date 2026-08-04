@@ -93,13 +93,14 @@ export function calculateNasRevenue(store: Store, pricing: Pricing) {
 
 export function calculateManagementPartnerPayment(store: Store, pricing: Pricing) {
   const { simple, normal, dirty } = mixCounts(store);
+  const finishingUnitPrice = store.directFinishingCostPerUnit;
   return (
-    simple * pricing.attaToNas.simpleFinishing +
-    normal * pricing.attaToNas.normalFinishing +
-    dirty * pricing.attaToNas.dirtyFinishing +
-    store.washCount * pricing.attaToNas.wash +
+    simple * (finishingUnitPrice ?? pricing.attaToNas.simpleFinishing) +
+    normal * (finishingUnitPrice ?? pricing.attaToNas.normalFinishing) +
+    dirty * (finishingUnitPrice ?? pricing.attaToNas.dirtyFinishing) +
+    store.washCount * (store.directWashCostPerUnit ?? pricing.attaToNas.wash) +
     store.photoCount * pricing.attaToNas.photo +
-    store.recheckCount * pricing.attaToNas.recheck
+    store.recheckCount * (store.directRecheckCostPerUnit ?? pricing.attaToNas.recheck)
   );
 }
 
