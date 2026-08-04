@@ -91,9 +91,21 @@ export function calculateNasRevenue(store: Store, pricing: Pricing) {
   );
 }
 
+export function calculateManagementPartnerPayment(store: Store, pricing: Pricing) {
+  const { simple, normal, dirty } = mixCounts(store);
+  return (
+    simple * pricing.attaToNas.simpleFinishing +
+    normal * pricing.attaToNas.normalFinishing +
+    dirty * pricing.attaToNas.dirtyFinishing +
+    store.washCount * pricing.attaToNas.wash +
+    store.photoCount * pricing.attaToNas.photo +
+    store.recheckCount * pricing.attaToNas.recheck
+  );
+}
+
 export function calculateAttaDirectCost(store: Store, pricing: Pricing) {
   if (store.actualDirectCost != null) return store.actualDirectCost;
-  if (store.managedByNas) return calculateNasRevenue(store, pricing);
+  if (store.managementPartner !== "atta") return calculateManagementPartnerPayment(store, pricing);
   const { simple, normal, dirty } = mixCounts(store);
   const finishingCost =
     simple * (store.directFinishingCostPerUnit ?? pricing.attaToNas.simpleFinishing) +
@@ -203,6 +215,7 @@ export function expansionStore(inputs: ExpansionInputs): Store {
     shortName: "追加店",
     category: "forecast",
     managedByNas: inputs.managedByNas,
+    managementPartner: inputs.managedByNas ? "nas" : "atta",
     finishingCount: inputs.finishingCount,
     simpleFinishingCount: inputs.finishingCount * (inputs.simpleShare / shareTotal),
     normalFinishingCount: inputs.finishingCount * (inputs.normalShare / shareTotal),

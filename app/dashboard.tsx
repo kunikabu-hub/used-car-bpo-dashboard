@@ -16,6 +16,7 @@ import type {
   Pricing,
   SimulationSettings,
   StarterKitAccountingMethod,
+  Store,
   StoreFinancials,
   TaxMode,
 } from "../lib/types";
@@ -27,6 +28,8 @@ const number = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 });
 const percent = new Intl.NumberFormat("ja-JP", { style: "percent", maximumFractionDigits: 1 });
 const compactYen = (value: number) => `${number.format(value / 10_000)}万円`;
 const cx = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(" ");
+const managementLabel = (store: Store) => store.managementPartner === "nas" ? "NaS管理" : store.managementPartner === "liveColor" ? "LIVE COLOR管理" : "直接運営";
+const managementDescription = (store: Store) => store.managementPartner === "nas" ? "NaS管理対象店舗" : store.managementPartner === "liveColor" ? "LIVE COLOR管理対象店舗" : "アッタデザイン直接運営";
 
 const navItems: Array<{ id: Tab; label: string; icon: string }> = [
   { id: "summary", label: "サマリー", icon: "◫" },
@@ -148,7 +151,7 @@ function FormulaDetails() {
     <details className="formula-details">
       <summary>計算根拠を表示</summary>
       <div className="formula-grid">
-        <div><strong>アッタ直接粗利</strong><code>ガリバー売上 − NaSまたは直接スタッフ支払</code></div>
+        <div><strong>アッタ直接粗利</strong><code>ガリバー売上 − 管理パートナーまたは直接スタッフ支払</code></div>
         <div><strong>初年度キャッシュ利益</strong><code>年間直接粗利 − 新規店舗数 × 600,000円</code></div>
         <div><strong>投資回収月数</strong><code>600,000円 ÷ 1店舗当たり月間直接粗利</code></div>
         <div><strong>NaS用具費控除後利益</strong><code>NaS直接粗利 − 管理店舗数 × 30,000円</code></div>
@@ -217,7 +220,7 @@ export default function Dashboard() {
           {navItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setMobileNav(false); }}><span>{item.icon}</span>{item.label}</button>)}
         </nav>
         <div className="side-note"><span>MODEL STATUS</span><strong><i /> 正常</strong><small>初期投資・用具費を反映済み</small></div>
-        <div className="sidebar-footer"><span>基準日</span><strong>2026年7月</strong></div>
+        <div className="sidebar-footer"><span>基準日</span><strong>2026年8月</strong></div>
       </aside>
 
       <main>
@@ -231,15 +234,15 @@ export default function Dashboard() {
           {tab === "summary" ? (
             <>
               <section className="hero-row">
-                <div><span className="eyebrow">EXECUTIVE SUMMARY</span><h1>収益と投資を、同じ画面で判断する。</h1><p>既存5店舗の直接粗利に、新規出店のスターターキット投資とNaSの継続用具費を重ねて確認できます。</p></div>
-                <div className="hero-badge"><span>現在</span><strong>5</strong><small>対象店舗</small><i>うちNaS管理 3店舗</i></div>
+                <div><span className="eyebrow">EXECUTIVE SUMMARY</span><h1>収益と投資を、同じ画面で判断する。</h1><p>対象{stores.length}店舗の直接粗利に、新規出店のスターターキット投資とNaSの継続用具費を重ねて確認できます。</p></div>
+                <div className="hero-badge"><span>現在</span><strong>{stores.length}</strong><small>対象店舗</small><i>うちNaS管理 {currentNasStores}店舗</i></div>
               </section>
 
               <section className="metric-grid primary-metrics">
-                <MetricCard label="アッタ月間売上" value={yen.format(totals.attaRevenue)} helper={`年間 ${compactYen(totals.attaRevenue * 12)}`} formula="5店舗のガリバー売上合計" />
-                <MetricCard label="アッタ月間直接粗利" value={yen.format(totals.attaGross)} helper={`直接粗利率 ${percent.format(totals.attaGross / totals.attaRevenue)}`} tone="blue" formula="売上 − NaSまたは直接スタッフ支払" />
-                <MetricCard label="NaS月間受取" value={yen.format(totals.nasRevenue)} helper="NaS管理3店舗のみ" tone="cyan" />
-                <MetricCard label="NaS用具費控除後利益" value={yen.format(totals.nasContribution)} helper={`利益率 ${percent.format(totals.nasContribution / totals.nasRevenue)}`} tone="green" formula="NaS直接粗利 − 3店舗 × 月間用具費" />
+                <MetricCard label="アッタ月間売上" value={yen.format(totals.attaRevenue)} helper={`年間 ${compactYen(totals.attaRevenue * 12)}`} formula={`${stores.length}店舗のガリバー売上合計`} />
+                <MetricCard label="アッタ月間直接粗利" value={yen.format(totals.attaGross)} helper={`直接粗利率 ${percent.format(totals.attaGross / totals.attaRevenue)}`} tone="blue" formula="売上 − 管理パートナーまたは直接スタッフ支払" />
+                <MetricCard label="NaS月間受取" value={yen.format(totals.nasRevenue)} helper={`NaS管理${currentNasStores}店舗のみ`} tone="cyan" />
+                <MetricCard label="NaS用具費控除後利益" value={yen.format(totals.nasContribution)} helper={`利益率 ${percent.format(totals.nasContribution / totals.nasRevenue)}`} tone="green" formula={`NaS直接粗利 − ${currentNasStores}店舗 × 月間用具費`} />
               </section>
               <section className="operations-strip">
                 <div><span>月間仕上げ</span><strong>{number.format(totals.finishing)}台</strong></div>
@@ -254,7 +257,7 @@ export default function Dashboard() {
                 <MetricCard label="スターターキット投資額" value={yen.format(expansion.starterKitInvestment)} helper={`1店舗 ${yen.format(settings.operatingCosts.attaStarterKitCostPerStore)}`} tone="amber" />
                 <MetricCard label="投資回収月数" value={`${number.format(expansion.paybackMonths)}か月`} helper="1店舗当たり月間直接粗利で回収" tone="violet" />
                 <MetricCard label="初年度キャッシュ利益" value={yen.format(expansion.firstYearCashProfit)} helper="年間直接粗利 − 初期投資" tone="blue" />
-                <MetricCard label="NaS月間用具費（総額）" value={yen.format(totalNasStores * settings.operatingCosts.nasMonthlySupplyCostPerStore)} helper={`既存3＋新規${inputs.storeCount}店舗／年 ${compactYen(totalNasStores * settings.operatingCosts.nasMonthlySupplyCostPerStore * 12)}`} tone="cyan" />
+                <MetricCard label="NaS月間用具費（総額）" value={yen.format(totalNasStores * settings.operatingCosts.nasMonthlySupplyCostPerStore)} helper={`既存${currentNasStores}＋新規${inputs.storeCount}店舗／年 ${compactYen(totalNasStores * settings.operatingCosts.nasMonthlySupplyCostPerStore * 12)}`} tone="cyan" />
               </section>
 
               <div className="two-column">
@@ -271,7 +274,7 @@ export default function Dashboard() {
                     <div><span>NaS受取</span><strong>{compactYen(totals.nasRevenue)}</strong></div><b>→</b>
                     <div className="flow-nas"><span>NaS用具費後</span><strong>{compactYen(totals.nasContribution)}</strong></div>
                   </div>
-                  <p className="panel-note">NaSを介さない八王子・一宮は、直接スタッフ支払としてアッタ原価に計上しています。</p>
+                  <p className="panel-note">八王子・一宮は直接スタッフ支払、新狭山はLIVE COLORへの管理委託費としてアッタ原価に計上しています。</p>
                 </section>
               </div>
 
@@ -289,7 +292,7 @@ export default function Dashboard() {
               <section className="explanation">
                 <div><span>このシミュレーションの考え方</span><h2>実績・移行・将来想定を分けて、直接粗利から資金負担まで追います。</h2></div>
                 <ul>
-                  <li>八王子は月平均実績売上・実績原価を優先</li><li>一宮は既存実績を基に新運用へ移行</li><li>NaSは現在3店舗のみを管理</li><li>撮影は仕上げ担当、リチェック＋登録は専任担当</li><li>リチェック換算率は初期値0.75、枠ごとに固定レンジを適用</li><li>本部人件費・交通費・保険・採用費などは未控除</li>
+                  <li>八王子は月平均実績売上・実績原価を優先</li><li>一宮は既存実績を基に新運用へ移行</li><li>NaSは草加・大宮・つくばの3店舗を管理</li><li>新狭山はLIVE COLOR管理</li><li>つくばは展示在庫150台、業務量は標準モデルで仮置き</li><li>リチェック換算率は初期値0.75、枠ごとに固定レンジを適用</li><li>本部人件費・交通費・保険・採用費などは未控除</li>
                 </ul>
               </section>
               <FormulaDetails />
@@ -310,21 +313,21 @@ function StoresView({ financials, selected, setSelected, settings }: { financial
   const monthlyKitExpense = starterKitMonthlyExpense(settings.operatingCosts.attaStarterKitCostPerStore, settings.operatingCosts.starterKitAccountingMethod);
   return <>
     <SectionTitle eyebrow="STORE PORTFOLIO" title="店舗別収益と投資回収" />
-    <div className="store-chips">{financials.map((item) => <button key={item.store.id} className={selected.store.id === item.store.id ? "active" : ""} onClick={() => setSelected(item.store.id)}><span className={`status-dot ${item.store.category}`} />{item.store.shortName}<small>{item.store.managedByNas ? "NaS管理" : "直接運営"}</small></button>)}</div>
+    <div className="store-chips">{financials.map((item) => <button key={item.store.id} className={selected.store.id === item.store.id ? "active" : ""} onClick={() => setSelected(item.store.id)}><span className={`status-dot ${item.store.category}`} />{item.store.shortName}<small>{managementLabel(item.store)}</small></button>)}</div>
     <div className="detail-grid">
       <section className="panel store-profile">
-        <div className="store-header"><div><span className={`category-label ${selected.store.category}`}>{selected.store.category === "actual" ? "実績" : selected.store.category === "transition" ? "移行中" : "想定"}</span><h1>{selected.store.name}</h1><p>{selected.store.managedByNas ? "NaS管理対象店舗" : "アッタデザイン直接運営"}</p></div><div className="inventory"><strong>{selected.store.displayInventory ?? "—"}</strong><span>MAX展示数</span></div></div>
+        <div className="store-header"><div><span className={`category-label ${selected.store.category}`}>{selected.store.category === "actual" ? "実績" : selected.store.category === "transition" ? "移行中" : "想定"}</span><h1>{selected.store.name}</h1><p>{managementDescription(selected.store)}{selected.store.sourceUrl ? <> ／ <a href={selected.store.sourceUrl} target="_blank" rel="noreferrer">店舗公式 ↗</a></> : null}</p></div><div className="inventory"><strong>{selected.store.displayInventory ?? "—"}</strong><span>MAX展示数</span></div></div>
         <div className="detail-kpis"><div><span>仕上げ</span><strong>{number.format(selected.store.finishingCount)}台</strong></div><div><span>水洗い</span><strong>{number.format(selected.store.washCount)}台</strong></div><div><span>撮影</span><strong>{number.format(selected.store.photoCount)}台</strong></div><div><span>リチェック</span><strong>{number.format(selected.store.recheckCount)}台</strong></div><div><span>担当／枠</span><strong>{selected.store.recheckWorkers}名／{selected.store.recheckSlots}枠</strong></div></div>
         <div className="note-columns"><div><span>現状・課題</span>{selected.store.notes.map((note) => <p key={note}>• {note}</p>)}</div><div><span>改善余地</span>{selected.store.opportunities.map((note) => <p key={note}>• {note}</p>)}</div></div>
       </section>
       <section className="panel financial-stack">
-        <h3>アッタデザイン</h3><div><span>売上</span><strong>{yen.format(selected.attaRevenue)}</strong></div>{selected.photoContractRevenue > 0 ? <div className="revenue-detail"><span>うち撮影契約収益</span><strong>{yen.format(selected.photoContractRevenue)}</strong></div> : null}<div><span>NaS／直接スタッフ支払</span><strong>− {yen.format(selected.attaDirectCost)}</strong></div>{selected.directPhotoStaffCost > 0 ? <div className="cost-detail"><span>うち撮影専任報酬</span><strong>{yen.format(selected.directPhotoStaffCost)}</strong></div> : null}<div className="profit"><span>直接粗利</span><strong>{yen.format(selected.attaGrossProfit)}</strong></div><div><span>直接粗利率</span><strong>{percent.format(selected.attaGrossMargin)}</strong></div>
+        <h3>アッタデザイン</h3><div><span>売上</span><strong>{yen.format(selected.attaRevenue)}</strong></div>{selected.photoContractRevenue > 0 ? <div className="revenue-detail"><span>うち撮影契約収益</span><strong>{yen.format(selected.photoContractRevenue)}</strong></div> : null}<div><span>管理パートナー／直接スタッフ支払</span><strong>− {yen.format(selected.attaDirectCost)}</strong></div>{selected.directPhotoStaffCost > 0 ? <div className="cost-detail"><span>うち撮影専任報酬</span><strong>{yen.format(selected.directPhotoStaffCost)}</strong></div> : null}<div className="profit"><span>直接粗利</span><strong>{yen.format(selected.attaGrossProfit)}</strong></div><div><span>直接粗利率</span><strong>{percent.format(selected.attaGrossMargin)}</strong></div>
         {selected.store.managedByNas ? <><h3>NaS</h3><div><span>受取額</span><strong>{yen.format(selected.nasRevenue)}</strong></div><div><span>スタッフ支払</span><strong>− {yen.format(selected.nasStaffCost)}</strong></div><div><span>月次用具費</span><strong>− {yen.format(selected.nasSupplyCost)}</strong></div><div className="profit green"><span>用具費控除後利益</span><strong>{yen.format(selected.nasContributionProfit)}</strong></div></> : null}
       </section>
     </div>
     <section className="metric-grid secondary-metrics">
-      <MetricCard label="スターターキット" value="導入済み" helper={`${yen.format(selected.store.starterKitCost)}／${selected.store.openingMonth}`} tone="green" />
-      <MetricCard label="初期投資回収" value="回収済み" helper="既存店のため将来追加投資から除外" tone="blue" />
+      <MetricCard label="スターターキット" value={selected.store.starterKitInstalled ? "導入済み" : "未導入"} helper={`${yen.format(selected.store.starterKitCost)}／${selected.store.openingMonth}`} tone={selected.store.starterKitInstalled ? "green" : "amber"} />
+      <MetricCard label="初期投資回収" value={selected.store.starterKitInstalled ? "回収済み" : "未回収"} helper={selected.store.starterKitInstalled ? "既存店のため将来追加投資から除外" : "開設月にスターターキット支出予定"} tone={selected.store.starterKitInstalled ? "blue" : "violet"} />
       <MetricCard label="累計粗利（年換算）" value={yen.format(selected.annualAttaGrossProfit)} helper="月間直接粗利 × 12" tone="violet" />
       <MetricCard label="投資回収率（年換算）" value={percent.format(selected.annualAttaGrossProfit / selected.store.starterKitCost)} helper={`会計表示月額 ${yen.format(monthlyKitExpense)}`} tone="amber" />
     </section>
@@ -332,7 +335,7 @@ function StoresView({ financials, selected, setSelected, settings }: { financial
       <section className="panel"><SectionTitle eyebrow="PAYBACK" title="店舗別 投資回収期間" /><BarComparison rows={financials.map((item) => ({ label: item.store.shortName, primary: settings.operatingCosts.attaStarterKitCostPerStore / Math.max(1, item.attaGrossProfit), accent: "blue" }))} valueLabel={(value) => `${number.format(value)}か月`} /></section>
       <section className="panel"><SectionTitle eyebrow="NaS CONTRIBUTION" title="NaS直接粗利と用具費控除後利益" /><div className="legend"><span><i className="legend-blue" />直接粗利</span><span><i className="legend-green" />用具費控除後</span></div><BarComparison rows={financials.filter((item) => item.store.managedByNas).map((item) => ({ label: item.store.shortName, primary: item.nasGrossProfit, secondary: item.nasContributionProfit, secondaryAccent: "green" as const }))} /></section>
     </div>
-    <section className="panel table-panel"><SectionTitle eyebrow="ALL STORES" title="店舗別比較表" /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>区分</th><th>売上</th><th>直接原価</th><th>アッタ粗利</th><th>粗利率</th><th>NaS粗利</th><th>用具費後NaS利益</th><th>仕上げ</th><th>水洗い</th><th>撮影</th><th>リチェック</th></tr></thead><tbody>{financials.map((item) => <tr key={item.store.id}><td><button className="table-link" onClick={() => setSelected(item.store.id)}>{item.store.name}</button></td><td>{item.store.category === "actual" ? "実績" : item.store.category === "transition" ? "移行" : "想定"}</td><td>{yen.format(item.attaRevenue)}</td><td>{yen.format(item.attaDirectCost)}</td><td>{yen.format(item.attaGrossProfit)}</td><td>{percent.format(item.attaGrossMargin)}</td><td>{item.store.managedByNas ? yen.format(item.nasGrossProfit) : "—"}</td><td>{item.store.managedByNas ? yen.format(item.nasContributionProfit) : "—"}</td><td>{number.format(item.store.finishingCount)}</td><td>{number.format(item.store.washCount)}</td><td>{number.format(item.store.photoCount)}</td><td>{number.format(item.store.recheckCount)}</td></tr>)}</tbody></table></div></section>
+    <section className="panel table-panel"><SectionTitle eyebrow="ALL STORES" title="店舗別比較表" /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>区分</th><th>管理</th><th>売上</th><th>直接原価</th><th>アッタ粗利</th><th>粗利率</th><th>NaS粗利</th><th>用具費後NaS利益</th><th>仕上げ</th><th>水洗い</th><th>撮影</th><th>リチェック</th></tr></thead><tbody>{financials.map((item) => <tr key={item.store.id}><td><button className="table-link" onClick={() => setSelected(item.store.id)}>{item.store.name}</button></td><td>{item.store.category === "actual" ? "実績" : item.store.category === "transition" ? "移行" : "想定"}</td><td>{managementLabel(item.store)}</td><td>{yen.format(item.attaRevenue)}</td><td>{yen.format(item.attaDirectCost)}</td><td>{yen.format(item.attaGrossProfit)}</td><td>{percent.format(item.attaGrossMargin)}</td><td>{item.store.managedByNas ? yen.format(item.nasGrossProfit) : "—"}</td><td>{item.store.managedByNas ? yen.format(item.nasContributionProfit) : "—"}</td><td>{number.format(item.store.finishingCount)}</td><td>{number.format(item.store.washCount)}</td><td>{number.format(item.store.photoCount)}</td><td>{number.format(item.store.recheckCount)}</td></tr>)}</tbody></table></div></section>
   </>;
 }
 
@@ -386,6 +389,6 @@ function SettingsView({ settings, setSettings, updateOperating, updatePrice }: a
     <section className="panel"><SectionTitle eyebrow="OPERATING COST" title="初期投資・用具費" /><div className="form-grid settings-grid"><NumberInput label="アッタ スターターキット／店" value={settings.operatingCosts.attaStarterKitCostPerStore} onChange={(value) => updateOperating("attaStarterKitCostPerStore", value)} suffix="円" step={10_000} /><NumberInput label="NaS 月間用具費／管理店" value={settings.operatingCosts.nasMonthlySupplyCostPerStore} onChange={(value) => updateOperating("nasMonthlySupplyCostPerStore", value)} suffix="円" step={1_000} /><SelectField label="スターターキット会計表示" value={settings.operatingCosts.starterKitAccountingMethod} onChange={(value) => updateOperating("starterKitAccountingMethod", value as StarterKitAccountingMethod)}><option value="cash">一括費用計上</option><option value="amortize12">12か月按分</option><option value="amortize24">24か月按分</option><option value="amortize36">36か月按分</option></SelectField><NumberInput label="会計表示上の月額" value={starterKitMonthlyExpense(settings.operatingCosts.attaStarterKitCostPerStore, settings.operatingCosts.starterKitAccountingMethod)} onChange={() => {}} suffix="円/月" step={1} /></div><p className="panel-note">キャッシュフローでは会計表示方法にかかわらず、開設月にスターターキット全額を支出します。</p></section>
     <section className="panel"><SectionTitle eyebrow="RECHECK CONTRACT" title="リチェック＋登録契約" /><div className="form-grid settings-grid"><NumberInput label="換算率" value={settings.recheckConversionRate} onChange={(value) => setSettings((current: SimulationSettings) => ({ ...current, recheckConversionRate: value }))} step={0.05} /><NumberInput label="固定レンジ下限" value={settings.pricing.client.recheckLowerUnits} onChange={(value) => updatePrice("client", "recheckLowerUnits", value)} suffix="換算台" /><NumberInput label="固定レンジ上限" value={settings.pricing.client.recheckUpperUnits} onChange={(value) => updatePrice("client", "recheckUpperUnits", value)} suffix="換算台" /><SelectField label="表示税区分" value={settings.taxMode} onChange={(value) => setSettings((current: SimulationSettings) => ({ ...current, taxMode: value as TaxMode }))}><option value="taxExclusive">税抜</option><option value="taxIncluded">税込（10%）</option></SelectField></div></section>
     <div className="price-group-grid">{priceGroups.map((group) => <section className="panel" key={group.key}><h3>{group.title}</h3>{group.fields.map(([key, label]) => <NumberInput key={key} label={label} value={(settings.pricing as any)[group.key][key]} onChange={(value) => updatePrice(group.key, key, value)} suffix="円" step={key === "recheckAdjustmentUnitPrice" ? 0.001 : 100} />)}</section>)}</div>
-    <section className="panel assumptions-table"><SectionTitle eyebrow="ASSUMPTION REGISTER" title="前提値一覧" /><div className="table-scroll"><table><thead><tr><th>区分</th><th>項目</th><th>初期値</th><th>扱い</th><th>根拠</th></tr></thead><tbody><tr><td>既存店</td><td>NaS管理店舗</td><td>3店舗</td><td>固定対象</td><td>新狭山・大宮・草加のみ</td></tr><tr><td>追加店</td><td>標準処理量</td><td>仕上げ150／水洗い300／撮影150／リチェック70</td><td>変更可</td><td>Excel標準店舗モデル</td></tr><tr><td>投資</td><td>スターターキット</td><td>{yen.format(settings.operatingCosts.attaStarterKitCostPerStore)}</td><td>開設月キャッシュアウト</td><td>ユーザー提示条件</td></tr><tr><td>継続費</td><td>NaS用具費</td><td>{yen.format(settings.operatingCosts.nasMonthlySupplyCostPerStore)}/管理店</td><td>毎月</td><td>ユーザー提示条件</td></tr><tr><td>会計</td><td>本部費用</td><td>未控除</td><td>モデル範囲外</td><td>直接粗利・営業貢献利益まで</td></tr></tbody></table></div></section>
+    <section className="panel assumptions-table"><SectionTitle eyebrow="ASSUMPTION REGISTER" title="前提値一覧" /><div className="table-scroll"><table><thead><tr><th>区分</th><th>項目</th><th>初期値</th><th>扱い</th><th>根拠</th></tr></thead><tbody><tr><td>対象店</td><td>NaS管理店舗</td><td>3店舗</td><td>固定対象</td><td>草加・大宮・つくば</td></tr><tr><td>対象店</td><td>LIVE COLOR管理店舗</td><td>1店舗</td><td>固定対象</td><td>新狭山</td></tr><tr><td>追加店</td><td>標準処理量</td><td>仕上げ150／水洗い300／撮影150／リチェック70</td><td>変更可</td><td>Excel標準店舗モデル</td></tr><tr><td>投資</td><td>スターターキット</td><td>{yen.format(settings.operatingCosts.attaStarterKitCostPerStore)}</td><td>開設月キャッシュアウト</td><td>ユーザー提示条件</td></tr><tr><td>継続費</td><td>NaS用具費</td><td>{yen.format(settings.operatingCosts.nasMonthlySupplyCostPerStore)}/管理店</td><td>毎月</td><td>ユーザー提示条件</td></tr><tr><td>会計</td><td>本部費用</td><td>未控除</td><td>モデル範囲外</td><td>直接粗利・営業貢献利益まで</td></tr></tbody></table></div></section>
   </>;
 }

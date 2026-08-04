@@ -66,11 +66,34 @@ test("一宮は仕上げ180台・撮影150台、撮影専任報酬17万円で計
   assert.equal(result.attaGrossProfit, 1153704);
 });
 
-test("5店舗のMAX展示数を反映する", () => {
+test("6店舗のMAX展示数を反映する", () => {
   assert.deepEqual(
     Object.fromEntries(stores.map((store) => [store.id, store.displayInventory])),
-    { hachioji: 200, ichinomiya: 300, shinsayama: 200, omiya: 150, soka: 250 },
+    { hachioji: 200, ichinomiya: 300, shinsayama: 200, omiya: 150, soka: 250, tsukuba: 150 },
   );
+});
+
+test("NaSは草加・大宮・つくば、新狭山はLIVE COLOR管理", () => {
+  assert.deepEqual(
+    stores.filter((store) => store.managedByNas).map((store) => store.id).sort(),
+    ["omiya", "soka", "tsukuba"],
+  );
+  const shinsayama = stores.find((store) => store.id === "shinsayama");
+  assert.equal(shinsayama?.managedByNas, false);
+  assert.equal(shinsayama?.managementPartner, "liveColor");
+  assert.equal(calculateStoreSimulation(shinsayama, settings).nasSupplyCost, 0);
+});
+
+test("つくばは展示150台のNaS管理標準モデル", () => {
+  const tsukuba = stores.find((store) => store.id === "tsukuba");
+  const result = calculateStoreSimulation(tsukuba, settings);
+  assert.equal(tsukuba?.displayInventory, 150);
+  assert.equal(tsukuba?.finishingCount, 150);
+  assert.equal(tsukuba?.starterKitInstalled, false);
+  assert.equal(result.nasRevenue, 1055000);
+  assert.equal(result.nasStaffCost, 725000);
+  assert.equal(result.nasSupplyCost, 30000);
+  assert.equal(result.nasContributionProfit, 300000);
 });
 
 test("追加5店舗の初期投資とNaS用具費を計算する", () => {

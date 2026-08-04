@@ -6,7 +6,7 @@
 
 ### stores
 
-店舗マスター。`managed_by_nas`、運営区分、開設月、スターターキット導入日を保持します。
+店舗マスター。`management_partner`（アッタ／NaS／LIVE COLOR）、運営区分、開設月、スターターキット導入日、情報参照URLを保持します。
 
 ### store_monthly_operations
 

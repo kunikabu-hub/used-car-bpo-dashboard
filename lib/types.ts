@@ -1,4 +1,5 @@
 export type StoreCategory = "actual" | "transition" | "forecast";
+export type ManagementPartner = "atta" | "nas" | "liveColor";
 export type StarterKitAccountingMethod =
   | "cash"
   | "amortize12"
@@ -13,6 +14,8 @@ export type Store = {
   shortName: string;
   category: StoreCategory;
   managedByNas: boolean;
+  managementPartner: ManagementPartner;
+  sourceUrl?: string;
   displayInventory?: number;
   finishingCount: number;
   simpleFinishingCount?: number;
