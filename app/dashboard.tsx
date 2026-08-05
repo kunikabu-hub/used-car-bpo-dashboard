@@ -329,6 +329,7 @@ export default function Dashboard() {
 function ActualsView({ financials }: { financials: StoreFinancials[] }) {
   const [profiles, setProfiles] = useState<StoreOperatingProfile[]>(() => structuredClone(initialOperatingProfiles));
   const [selectedProfileId, setSelectedProfileId] = useState(initialOperatingProfiles[0].storeId);
+  const [resetNotice, setResetNotice] = useState(false);
   const revised = useMemo(() => summarizeOperatingForecast(profiles), [profiles]);
   const selectedProfile = profiles.find((profile) => profile.storeId === selectedProfileId) ?? profiles[0];
   const selectedForecast = calculateOperatingForecast(selectedProfile);
@@ -342,9 +343,9 @@ function ActualsView({ financials }: { financials: StoreFinancials[] }) {
     directCost: summary.directCost + store.outsourcingCost,
     grossProfit: summary.grossProfit + store.revenue - store.outsourcingCost,
   }), { revenue: 0, directCost: 0, grossProfit: 0 });
-  const updateProfile = (patch: Partial<StoreOperatingProfile>) => setProfiles((current) => current.map((profile) => profile.storeId === selectedProfile.storeId ? { ...profile, ...patch } : profile));
-  const updateService = (key: ServiceOperatingAssumption["key"], patch: Partial<ServiceOperatingAssumption>) => setProfiles((current) => current.map((profile) => profile.storeId === selectedProfile.storeId ? { ...profile, services: profile.services.map((service) => service.key === key ? { ...service, ...patch } : service) } : profile));
-  const resetProfiles = () => setProfiles(structuredClone(initialOperatingProfiles));
+  const updateProfile = (patch: Partial<StoreOperatingProfile>) => { setResetNotice(false); setProfiles((current) => current.map((profile) => profile.storeId === selectedProfile.storeId ? { ...profile, ...patch } : profile)); };
+  const updateService = (key: ServiceOperatingAssumption["key"], patch: Partial<ServiceOperatingAssumption>) => { setResetNotice(false); setProfiles((current) => current.map((profile) => profile.storeId === selectedProfile.storeId ? { ...profile, services: profile.services.map((service) => service.key === key ? { ...service, ...patch } : service) } : profile)); };
+  const resetProfiles = () => { setProfiles(structuredClone(initialOperatingProfiles)); setSelectedProfileId(initialOperatingProfiles[0].storeId); setResetNotice(true); };
   const phaseLabel = (phase: StorePhase) => phase === "unopened" ? "未開設" : phase === "ramp" ? "立ち上げ中" : "安定稼働";
   const actualByStore = new Map(july2026Actual.stores.map((store) => [store.id, store]));
   const planByStore = new Map(financials.map((item) => [item.store.id, item]));
@@ -369,7 +370,7 @@ function ActualsView({ financials }: { financials: StoreFinancials[] }) {
       <div><span>未稼働20%の売上余地</span><strong>{yen.format(july2026Summary.fullCapacityRevenue - july2026Actual.revenue)}</strong><small>80%稼働の単純換算</small></div>
     </section>
 
-    <SectionTitle eyebrow="REFORECAST MODEL" title="店舗フェーズ・業務別稼働率による修正予測" action={<button className="text-button" onClick={resetProfiles}>7月基準へ戻す</button>} />
+    <SectionTitle eyebrow="REFORECAST MODEL" title="店舗フェーズ・業務別稼働率による修正予測" action={<div className="reset-action"><button className={cx("text-button", resetNotice && "reset-complete")} onClick={resetProfiles}>{resetNotice ? "✓ 初期値に戻しました" : "再予測条件を初期値に戻す"}</button><span aria-live="polite">{resetNotice ? "店舗フェーズ・稼働率・固定費・最低保証を7月実績ベースへ戻しました。" : "7月実績ベースの設定へ戻します"}</span></div>} />
     <section className="metric-grid primary-metrics">
       <MetricCard label="当初計画売上" value={yen.format(planTotals.revenue)} helper={`粗利 ${yen.format(planTotals.grossProfit)}`} tone="violet" />
       <MetricCard label="比較対象7月売上" value={yen.format(comparableActual.revenue)} helper={`対象6店舗・所沢を除外／粗利 ${yen.format(comparableActual.grossProfit)}`} tone="blue" />
