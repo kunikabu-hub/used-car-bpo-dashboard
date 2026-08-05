@@ -93,7 +93,7 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
       calibratedService("photo", "撮影", 150, 90.5, 340_712, 0),
       calibratedService("registration", "登録関連", 65, 45, 210_358, 201_500),
     ],
-    note: "登録業務を独立。撮影スタッフ費は請求確定時に固定費または最低保証へ追加。",
+    note: "通常仕上げ8,250円（税込）を基準。登録業務を独立し、撮影スタッフ費は請求確定時に固定費または最低保証へ追加。",
   },
   {
     storeId: "shinsayama",

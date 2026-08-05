@@ -80,6 +80,7 @@ export const stores: Store[] = [
     recheckCount: 0,
     recheckWorkers: 0,
     recheckSlots: 0,
+    clientNormalFinishingPrice: 7_500,
     directFinishingCostPerUnit: 3_800,
     directPhotoConversionRate: 0.5,
     directPhotoBaseActualUnits: 150,
@@ -89,7 +90,7 @@ export const stores: Store[] = [
     starterKitInstalled: true,
     starterKitCost: 600_000,
     openingMonth: "既存店（支出済み）",
-    notes: ["仕上げ専任と撮影専任の分業", "仕上げ180台・撮影150台を想定", "撮影150実台×0.5＝75換算台", "撮影契約収益292,925円・撮影専任報酬170,000円", "リチェック業務は対象外"],
+    notes: ["通常仕上げ8,250円（税込）／7,500円（税抜）", "仕上げ専任と撮影専任の分業", "仕上げ180台・撮影150台を想定", "撮影150実台×0.5＝75換算台", "撮影契約収益292,925円・撮影専任報酬170,000円", "リチェック業務は対象外"],
     opportunities: ["撮影150台超の場合の人員・報酬条件を再設計", "仕上げと撮影の稼働差を継続監視"],
   },
   {

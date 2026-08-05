@@ -67,9 +67,10 @@ test("一宮は仕上げ180台・撮影150台、撮影専任報酬17万円で計
   assert.equal(stores[1].finishingCount, 180);
   assert.equal(stores[1].photoCount, 150);
   assert.equal(calculateDirectPhotoStaffCost(stores[1]), 170000);
-  assert.equal(result.attaRevenue, 2094890);
+  assert.equal(stores[1].clientNormalFinishingPrice, 7500);
+  assert.equal(result.attaRevenue, 1860890);
   assert.equal(result.attaDirectCost, 941186);
-  assert.equal(result.attaGrossProfit, 1153704);
+  assert.equal(result.attaGrossProfit, 919704);
 });
 
 test("6店舗のMAX展示数を反映する", () => {

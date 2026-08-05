@@ -45,9 +45,10 @@ export function calculateAttaRevenue(store: Store, settings: SimulationSettings)
   const { simple, normal, dirty } = mixCounts(store);
   const photoBundledNormal = store.billPhotoAsFinishingBundle === false ? 0 : Math.min(normal, store.photoCount);
   const normalWithoutPhoto = Math.max(0, normal - photoBundledNormal);
+  const normalFinishingPrice = store.clientNormalFinishingPrice ?? settings.pricing.client.normalFinishing;
   const finishingRevenue =
     simple * settings.pricing.client.simpleFinishing +
-    normalWithoutPhoto * settings.pricing.client.normalFinishing +
+    normalWithoutPhoto * normalFinishingPrice +
     photoBundledNormal * settings.pricing.client.normalFinishingWithPhoto +
     dirty * settings.pricing.client.dirtyFinishing;
   const washRevenue = store.washCount * settings.pricing.client.wash;
@@ -157,10 +158,11 @@ export function calculateNasGrossProfit(store: Store, pricing: Pricing) {
 export function calculateStoreSimulation(store: Store, settings: SimulationSettings): StoreFinancials {
   const { simple, normal, dirty } = mixCounts(store);
   const photoBundledNormal = store.billPhotoAsFinishingBundle === false ? 0 : Math.min(normal, store.photoCount);
+  const normalFinishingPrice = store.clientNormalFinishingPrice ?? settings.pricing.client.normalFinishing;
   const finishingRevenue = store.actualMonthlyRevenue != null
     ? 0
     : simple * settings.pricing.client.simpleFinishing +
-      (normal - photoBundledNormal) * settings.pricing.client.normalFinishing +
+      (normal - photoBundledNormal) * normalFinishingPrice +
       photoBundledNormal * settings.pricing.client.normalFinishingWithPhoto +
       dirty * settings.pricing.client.dirtyFinishing;
   const washRevenue = store.actualMonthlyRevenue != null ? 0 : store.washCount * settings.pricing.client.wash;

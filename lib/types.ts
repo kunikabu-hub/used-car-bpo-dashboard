@@ -31,6 +31,7 @@ export type Store = {
   recheckSlots: number;
   actualMonthlyRevenue?: number;
   actualDirectCost?: number;
+  clientNormalFinishingPrice?: number;
   directFinishingCostPerUnit?: number;
   directPhotoConversionRate?: number;
   directPhotoBaseActualUnits?: number;
