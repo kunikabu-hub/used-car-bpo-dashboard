@@ -11,6 +11,11 @@ import {
 } from "../lib/calculations.ts";
 import { defaultExpansionInputs, operatingCostSettings, pricing, stores } from "../lib/data.ts";
 import { july2026Actual, july2026Summary } from "../lib/actuals.ts";
+import {
+  calculateOperatingForecast,
+  initialOperatingProfiles,
+  summarizeOperatingForecast,
+} from "../lib/operating-model.ts";
 
 const settings = {
   taxMode: "taxExclusive",
@@ -129,4 +134,34 @@ test("2026年7月実績の売上・委託費・粗利率を集計する", () => 
   assert.ok(Math.abs(july2026Summary.grossMargin - 0.36728452948161305) < 1e-12);
   assert.equal(july2026Summary.equipmentCost, 176_301);
   assert.equal(july2026Summary.contributionProfit, 1_627_300);
+});
+
+test("業務別稼働率モデルの初期値は比較対象店舗の7月実績と一致する", () => {
+  const result = summarizeOperatingForecast(initialOperatingProfiles);
+  assert.equal(result.revenue, 4_774_637);
+  assert.equal(result.directCost, 3_107_036);
+  assert.equal(result.grossProfit, 1_667_601);
+  assert.ok(Math.abs(result.grossMargin - 0.34926236277229034) < 1e-12);
+});
+
+test("未開設店舗は稼働率を設定しても売上・原価を計上しない", () => {
+  const tsukuba = structuredClone(initialOperatingProfiles.find((profile) => profile.storeId === "tsukuba"));
+  tsukuba.services.forEach((service) => { service.utilization = 1; });
+  assert.deepEqual(calculateOperatingForecast(tsukuba), {
+    revenue: 0,
+    variableCost: 0,
+    directCost: 0,
+    grossProfit: 0,
+    grossMargin: 0,
+  });
+});
+
+test("最低保証は変動費を下回る場合だけ原価へ反映する", () => {
+  const soka = structuredClone(initialOperatingProfiles.find((profile) => profile.storeId === "soka"));
+  soka.services.forEach((service) => { service.utilization = 0; });
+  const result = calculateOperatingForecast(soka);
+  assert.equal(result.revenue, 0);
+  assert.equal(result.variableCost, 0);
+  assert.equal(result.directCost, 376_400);
+  assert.equal(result.grossProfit, -376_400);
 });

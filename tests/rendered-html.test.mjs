@@ -20,5 +20,6 @@ test("管理ダッシュボードをサーバー描画する", async () => {
   assert.match(html, /NaS用具費控除後利益/);
   assert.match(html, /2026年7月 確定実績/);
   assert.match(html, /直接粗利率/);
+  assert.match(html, /実績・再予測/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
