@@ -110,6 +110,20 @@ test("つくばは展示150台のNaS管理、当面は撮影なし", () => {
   assert.equal(result.nasContributionProfit, 300000);
 });
 
+test("大宮は展示車両水洗いを収益・原価に含めない", () => {
+  const omiya = stores.find((store) => store.id === "omiya");
+  assert.ok(omiya);
+  const result = calculateStoreSimulation(omiya, settings);
+  assert.equal(omiya.washCount, 0);
+  assert.equal(result.washRevenue, 0);
+  assert.equal(
+    result.nasRevenue,
+    omiya.normalFinishingCount * pricing.attaToNas.normalFinishing +
+      omiya.photoCount * pricing.attaToNas.photo +
+      omiya.recheckCount * pricing.attaToNas.recheck,
+  );
+});
+
 test("追加5店舗の初期投資とNaS用具費を計算する", () => {
   const result = calculateExpansionSimulation({ ...defaultExpansionInputs, storeCount: 5 }, settings);
   assert.equal(result.starterKitInvestment, 3000000);
