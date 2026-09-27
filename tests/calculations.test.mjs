@@ -13,6 +13,8 @@ import { defaultExpansionInputs, operatingCostSettings, pricing, stores } from "
 import { august2026Actual, august2026Summary, july2026Actual, july2026Summary } from "../lib/actuals.ts";
 import {
   calculateOperatingForecast,
+  calculateServiceRevenue,
+  calculateServiceVariableCost,
   initialOperatingProfiles,
   summarizeOperatingForecast,
 } from "../lib/operating-model.ts";
@@ -181,9 +183,31 @@ test("再予測は撮影・リチェックを実台数と新単価で別計算�
   assert.equal(shinsayama.services.find((service) => service.key === "recheck").capacityUnits * shinsayama.services.find((service) => service.key === "recheck").utilization, 107);
   assert.equal(shinsayama.services.find((service) => service.key === "recheck").outsourcingUnitPrice, 2_500);
   const result = summarizeOperatingForecast(initialOperatingProfiles);
-  assert.equal(result.revenue, 5_023_500);
-  assert.equal(result.directCost, 3_611_636);
-  assert.equal(result.grossProfit, 1_411_864);
+  assert.equal(result.revenue, 5_036_295);
+  assert.equal(result.directCost, 3_566_386);
+  assert.equal(result.grossProfit, 1_469_909);
+});
+
+test("大宮の仕上げは台数に応じて売上と委託費が増減する", () => {
+  const omiya = structuredClone(initialOperatingProfiles.find((profile) => profile.storeId === "omiya"));
+  const finishing = omiya.services.find((service) => service.key === "finishing");
+  finishing.utilization = 1;
+  assert.equal(calculateServiceRevenue(finishing), 1_144_000);
+  assert.equal(calculateServiceVariableCost(finishing), 585_000);
+});
+
+test("一宮の撮影は200台基準の減額方式で計算する", () => {
+  const ichinomiya = initialOperatingProfiles.find((profile) => profile.storeId === "ichinomiya");
+  const photo = structuredClone(ichinomiya.services.find((service) => service.key === "photo"));
+  photo.utilization = 1;
+  assert.equal(calculateServiceRevenue(photo), 407_000);
+  assert.equal(calculateServiceVariableCost(photo), 250_000);
+  photo.utilization = 199 / 200;
+  assert.equal(calculateServiceRevenue(photo), 405_305);
+  assert.equal(calculateServiceVariableCost(photo), 248_750);
+  photo.utilization = 181 / 200;
+  assert.equal(calculateServiceRevenue(photo), 374_795);
+  assert.equal(calculateServiceVariableCost(photo), 226_250);
 });
 
 test("未開設店舗は稼働率を設定しても売上・原価を計上しない", () => {

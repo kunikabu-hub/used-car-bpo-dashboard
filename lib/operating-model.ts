@@ -11,6 +11,14 @@ export type ServiceOperatingAssumption = {
   capacityVariableCost: number;
   billingUnitPrice?: number;
   outsourcingUnitPrice?: number;
+  billingBaseUnits?: number;
+  billingBaseAmount?: number;
+  billingDecreasePerUnit?: number;
+  outsourcingBaseUnits?: number;
+  outsourcingBaseAmount?: number;
+  outsourcingDecreasePerUnit?: number;
+  billingPricingNote?: string;
+  outsourcingPricingNote?: string;
 };
 
 export type StoreOperatingProfile = {
@@ -24,22 +32,50 @@ export type StoreOperatingProfile = {
 };
 
 const unitPricedService = (
-  key: "photo" | "recheck",
+  key: ServiceKey,
   label: string,
   capacityUnits: number,
   actualUnits: number,
   billingUnitPrice: number,
   outsourcingUnitPrice: number,
+  enabled = actualUnits > 0,
 ): ServiceOperatingAssumption => ({
   key,
   label,
-  enabled: actualUnits > 0,
+  enabled,
   capacityUnits,
   utilization: capacityUnits > 0 ? actualUnits / capacityUnits : 0,
   capacityRevenue: capacityUnits * billingUnitPrice,
   capacityVariableCost: capacityUnits * outsourcingUnitPrice,
   billingUnitPrice,
   outsourcingUnitPrice,
+});
+
+const decrementPricedService = (
+  key: "photo" | "recheck",
+  label: string,
+  baseUnits: number,
+  actualUnits: number,
+  billingBaseAmount: number,
+  billingDecreasePerUnit: number,
+  outsourcingBaseAmount: number,
+  outsourcingDecreasePerUnit: number,
+): ServiceOperatingAssumption => ({
+  key,
+  label,
+  enabled: actualUnits > 0,
+  capacityUnits: baseUnits,
+  utilization: actualUnits / baseUnits,
+  capacityRevenue: billingBaseAmount,
+  capacityVariableCost: outsourcingBaseAmount,
+  billingBaseUnits: baseUnits,
+  billingBaseAmount,
+  billingDecreasePerUnit,
+  outsourcingBaseUnits: baseUnits,
+  outsourcingBaseAmount,
+  outsourcingDecreasePerUnit,
+  billingPricingNote: `${baseUnits}台 ${billingBaseAmount.toLocaleString("ja-JP")}円／減額 ${billingDecreasePerUnit.toLocaleString("ja-JP")}円`,
+  outsourcingPricingNote: `${baseUnits}台 ${outsourcingBaseAmount.toLocaleString("ja-JP")}円／減額 ${outsourcingDecreasePerUnit.toLocaleString("ja-JP")}円`,
 });
 
 const calibratedService = (
@@ -96,7 +132,7 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     fixedCost: 294_500,
     minimumGuarantee: 0,
     services: [
-      calibratedService("finishing", "仕上げ", 130, 0, 0, 0),
+      unitPricedService("finishing", "仕上げ", 130, 0, 8_800, 4_500, true),
       calibratedService("wash", "水洗い", 260, 0, 0, 0),
       unitPricedService("photo", "撮影", 130, 0, 2_000, 1_500),
       unitPricedService("recheck", "リチェック＋登録", 100, 51, 2_500, 2_500),
@@ -112,7 +148,7 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     services: [
       calibratedService("finishing", "仕上げ", 180, 143, 1_075_000, 811_500),
       calibratedService("wash", "水洗い", 396.3, 277, 138_500, 60_940),
-      unitPricedService("photo", "撮影", 150, 181, 2_000, 1_500),
+      decrementPricedService("photo", "撮影", 200, 181, 407_000, 1_695, 250_000, 1_250),
       unitPricedService("recheck", "リチェック＋登録", 65, 45, 2_500, 2_000),
     ],
     note: "撮影181台、リチェック＋登録45台を実台数で計算。通常仕上げ8,250円（税込）を基準。",
@@ -152,11 +188,11 @@ export function calculateOperatingForecast(profile: StoreOperatingProfile) {
   }
   const activeServices = profile.services.filter((service) => service.enabled);
   const revenue = activeServices.reduce(
-    (sum, service) => sum + service.capacityRevenue * Math.max(0, service.utilization),
+    (sum, service) => sum + calculateServiceRevenue(service),
     0,
   );
   const variableCost = activeServices.reduce(
-    (sum, service) => sum + service.capacityVariableCost * Math.max(0, service.utilization),
+    (sum, service) => sum + calculateServiceVariableCost(service),
     0,
   );
   const directCost = profile.fixedCost + Math.max(profile.minimumGuarantee, variableCost);
@@ -168,6 +204,28 @@ export function calculateOperatingForecast(profile: StoreOperatingProfile) {
     grossProfit,
     grossMargin: revenue > 0 ? grossProfit / revenue : 0,
   };
+}
+
+function decrementAmount(units: number, baseUnits: number, baseAmount: number, decreasePerUnit: number) {
+  return Math.max(0, baseAmount - Math.max(0, baseUnits - Math.min(units, baseUnits)) * decreasePerUnit);
+}
+
+export function calculateServiceRevenue(service: ServiceOperatingAssumption) {
+  if (!service.enabled) return 0;
+  const units = service.capacityUnits * Math.max(0, service.utilization);
+  if (service.billingBaseUnits != null && service.billingBaseAmount != null && service.billingDecreasePerUnit != null) {
+    return decrementAmount(units, service.billingBaseUnits, service.billingBaseAmount, service.billingDecreasePerUnit);
+  }
+  return service.capacityRevenue * Math.max(0, service.utilization);
+}
+
+export function calculateServiceVariableCost(service: ServiceOperatingAssumption) {
+  if (!service.enabled) return 0;
+  const units = service.capacityUnits * Math.max(0, service.utilization);
+  if (service.outsourcingBaseUnits != null && service.outsourcingBaseAmount != null && service.outsourcingDecreasePerUnit != null) {
+    return decrementAmount(units, service.outsourcingBaseUnits, service.outsourcingBaseAmount, service.outsourcingDecreasePerUnit);
+  }
+  return service.capacityVariableCost * Math.max(0, service.utilization);
 }
 
 export function summarizeOperatingForecast(profiles: StoreOperatingProfile[]) {

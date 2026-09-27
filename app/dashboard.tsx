@@ -20,6 +20,8 @@ import {
 } from "../lib/actuals";
 import {
   calculateOperatingForecast,
+  calculateServiceRevenue,
+  calculateServiceVariableCost,
   initialOperatingProfiles,
   summarizeOperatingForecast,
 } from "../lib/operating-model";
@@ -481,10 +483,10 @@ function ActualsView({ financials }: { financials: StoreFinancials[] }) {
           <div className="service-assumption header"><span>業務</span><span>業務稼働率</span><span>予測台数</span><span>ガリバー請求</span><span>委託費</span></div>
           {selectedProfile.services.map((service) => <div className="service-assumption" key={service.key}>
             <label className="service-toggle"><input type="checkbox" checked={service.enabled} onChange={(event) => updateService(service.key, { enabled: event.target.checked })} /><span>{service.label}</span></label>
-            <div className="utilization-control"><input type="range" min="0" max="150" step="1" value={Math.round(service.utilization * 100)} onChange={(event) => updateService(service.key, { utilization: Number(event.target.value) / 100 })} disabled={!service.enabled} /><strong>{percent.format(service.utilization)}</strong></div>
+            <div className="utilization-control"><input type="range" min="0" max={service.billingBaseUnits ? "100" : "150"} step={service.billingUnitPrice != null || service.billingBaseUnits != null ? 100 / service.capacityUnits : 1} value={service.billingUnitPrice != null || service.billingBaseUnits != null ? service.utilization * 100 : Math.round(service.utilization * 100)} onChange={(event) => updateService(service.key, { utilization: Number(event.target.value) / 100 })} disabled={!service.enabled} /><strong>{percent.format(service.utilization)}</strong></div>
             <span>{number.format(service.capacityUnits * service.utilization)}台</span>
-            <strong>{yen.format(service.enabled ? service.capacityRevenue * service.utilization : 0)}{service.billingUnitPrice != null ? <small>{yen.format(service.billingUnitPrice)}／実台</small> : null}</strong>
-            <strong>{yen.format(service.enabled ? service.capacityVariableCost * service.utilization : 0)}{service.outsourcingUnitPrice != null ? <small>{yen.format(service.outsourcingUnitPrice)}／実台</small> : null}</strong>
+            <strong>{yen.format(calculateServiceRevenue(service))}{service.billingPricingNote ? <small>{service.billingPricingNote}</small> : service.billingUnitPrice != null ? <small>{yen.format(service.billingUnitPrice)}／実台</small> : null}</strong>
+            <strong>{yen.format(calculateServiceVariableCost(service))}{service.outsourcingPricingNote ? <small>{service.outsourcingPricingNote}</small> : service.outsourcingUnitPrice != null ? <small>{yen.format(service.outsourcingUnitPrice)}／実台</small> : null}</strong>
           </div>)}
         </div>
         <div className="forecast-result-strip"><div><span>修正売上</span><strong>{yen.format(selectedForecast.revenue)}</strong></div><div><span>固定＋変動原価</span><strong>{yen.format(selectedForecast.directCost)}</strong></div><div><span>直接粗利</span><strong className={selectedForecast.grossProfit < 0 ? "negative-text" : ""}>{yen.format(selectedForecast.grossProfit)}</strong></div><div><span>粗利率</span><strong>{percent.format(selectedForecast.grossMargin)}</strong></div></div>
