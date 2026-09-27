@@ -28,6 +28,9 @@ export type StoreOperatingProfile = {
   phase: StorePhase;
   fixedCost: number;
   minimumGuarantee: number;
+  useDirectFinancials?: boolean;
+  directRevenue?: number;
+  directCost?: number;
   services: ServiceOperatingAssumption[];
   note: string;
 };
@@ -190,6 +193,18 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
 ];
 
 export function calculateOperatingForecast(profile: StoreOperatingProfile) {
+  if (profile.useDirectFinancials) {
+    const revenue = Math.max(0, profile.directRevenue ?? 0);
+    const directCost = Math.max(0, profile.directCost ?? 0);
+    const grossProfit = revenue - directCost;
+    return {
+      revenue,
+      variableCost: directCost,
+      directCost,
+      grossProfit,
+      grossMargin: revenue > 0 ? grossProfit / revenue : 0,
+    };
+  }
   if (profile.phase === "unopened") {
     return { revenue: 0, variableCost: 0, directCost: 0, grossProfit: 0, grossMargin: 0 };
   }

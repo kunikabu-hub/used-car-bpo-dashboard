@@ -149,11 +149,11 @@ function TrendBars({
   );
 }
 
-function NumberInput({ label, value, onChange, suffix, min = 0, step = 1 }: { label: string; value: number; onChange: (value: number) => void; suffix?: string; min?: number; step?: number }) {
+function NumberInput({ label, value, onChange, suffix, min = 0, step = 1, disabled = false }: { label: string; value: number; onChange: (value: number) => void; suffix?: string; min?: number; step?: number; disabled?: boolean }) {
   return (
-    <label className="field">
+    <label className={cx("field", disabled && "field-disabled")}>
       <span>{label}</span>
-      <div className="field-input"><input type="number" min={min} step={step} value={value} onChange={(event) => onChange(Number(event.target.value) || 0)} />{suffix ? <em>{suffix}</em> : null}</div>
+      <div className="field-input"><input type="number" min={min} step={step} value={value} onChange={(event) => onChange(Number(event.target.value) || 0)} disabled={disabled} />{suffix ? <em>{suffix}</em> : null}</div>
     </label>
   );
 }
@@ -187,6 +187,7 @@ export default function Dashboard() {
   const [inputs, setInputs] = useState<ExpansionInputs>({ ...defaultExpansionInputs });
   const [storeModels, setStoreModels] = useState<Store[]>(() => structuredClone(stores));
   const [operatingProfiles, setOperatingProfiles] = useState<StoreOperatingProfile[]>(() => structuredClone(initialOperatingProfiles));
+  const [paybackMonthsOverride, setPaybackMonthsOverride] = useState<number | null>(null);
   const [settings, setSettings] = useState<SimulationSettings>({
     taxMode: "taxExclusive",
     taxRate: 0.1,
@@ -197,6 +198,7 @@ export default function Dashboard() {
 
   const financials = useMemo(() => storeModels.map((store) => calculateStoreSimulation(store, settings)), [settings, storeModels]);
   const expansion = useMemo(() => calculateExpansionSimulation(inputs, settings), [inputs, settings]);
+  const displayedPaybackMonths = paybackMonthsOverride ?? expansion.paybackMonths;
   const simultaneous = useMemo(() => calculateCashFlow(inputs, settings, cashMonths, "simultaneous"), [inputs, settings, cashMonths]);
   const phased = useMemo(() => calculateCashFlow(inputs, settings, cashMonths, "phased"), [inputs, settings, cashMonths]);
   const cashFlow = deploymentMode === "simultaneous" ? simultaneous : phased;
@@ -288,7 +290,7 @@ export default function Dashboard() {
               <SectionTitle eyebrow="SEPARATE EXPANSION MODEL" title={`新規出店（別試算）：追加${inputs.storeCount}店舗の投資・回収`} action={<button className="text-button" onClick={() => setTab("simulator")}>条件を変更 →</button>} />
               <section className="metric-grid secondary-metrics">
                 <MetricCard label="スターターキット投資額" value={yen.format(expansion.starterKitInvestment)} helper={`1店舗 ${yen.format(settings.operatingCosts.attaStarterKitCostPerStore)}`} tone="amber" />
-                <MetricCard label="投資回収月数" value={`${number.format(expansion.paybackMonths)}か月`} helper="1店舗当たり月間直接粗利で回収" tone="violet" />
+                <MetricCard label="投資回収月数" value={`${number.format(displayedPaybackMonths)}か月`} helper={paybackMonthsOverride == null ? "1店舗当たり月間直接粗利から自動計算" : "店舗追加ページで直接入力中"} tone="violet" />
                 <MetricCard label="初年度キャッシュ利益" value={yen.format(expansion.firstYearCashProfit)} helper="年間直接粗利 − 初期投資" tone="blue" />
                 <MetricCard label="NaS月間用具費（総額）" value={yen.format(totalNasStores * settings.operatingCosts.nasMonthlySupplyCostPerStore)} helper={`既存${currentNasStores}＋新規${inputs.storeCount}店舗／年 ${compactYen(totalNasStores * settings.operatingCosts.nasMonthlySupplyCostPerStore * 12)}`} tone="cyan" />
               </section>
@@ -335,7 +337,7 @@ export default function Dashboard() {
           {tab === "actuals" ? <ActualsView profiles={operatingProfiles} setProfiles={setOperatingProfiles} /> : null}
           {tab === "stores" ? <StoresView financials={financials} selected={selectedFinancial} setSelected={setSelectedStore} settings={settings} /> : null}
           {tab === "cashflow" ? <CashFlowView months={cashMonths} setMonths={setCashMonths} mode={deploymentMode} setMode={setDeploymentMode} flow={cashFlow} simultaneous={simultaneous} phased={phased} simSummary={simSummary} phasedSummary={phasedSummary} investment={expansion.starterKitInvestment} /> : null}
-          {tab === "simulator" ? <SimulatorView inputs={inputs} updateInputs={updateInputs} expansion={expansion} settings={settings} setSettings={setSettings} /> : null}
+          {tab === "simulator" ? <SimulatorView inputs={inputs} updateInputs={updateInputs} expansion={expansion} settings={settings} setSettings={setSettings} paybackMonthsOverride={paybackMonthsOverride} setPaybackMonthsOverride={setPaybackMonthsOverride} /> : null}
           {tab === "settings" ? <SettingsView settings={settings} setSettings={setSettings} updateOperating={updateOperating} updatePrice={updatePrice} storeModels={storeModels} updateStoreFinishingCost={updateStoreFinishingCost} /> : null}
         </div>
       </main>
@@ -448,6 +450,18 @@ function ActualsView({ profiles, setProfiles }: { profiles: StoreOperatingProfil
   const selectedFinishing = selectedProfile.services.find((service) => service.key === "finishing");
   const selectedFinishingUnits = selectedFinishing?.enabled ? selectedFinishing.capacityUnits * selectedFinishing.utilization : 0;
   const selectedCoverage = selectedProfile.inventoryUnits > 0 ? selectedFinishingUnits / selectedProfile.inventoryUnits : 0;
+  const toggleDirectFinancials = (enabled: boolean) => {
+    if (!enabled) {
+      updateProfile({ useDirectFinancials: false });
+      return;
+    }
+    const automatic = calculateOperatingForecast({ ...selectedProfile, useDirectFinancials: false });
+    updateProfile({
+      useDirectFinancials: true,
+      directRevenue: automatic.revenue,
+      directCost: automatic.directCost,
+    });
+  };
 
   return <>
     <ActualHistoryView />
@@ -482,7 +496,7 @@ function ActualsView({ profiles, setProfiles }: { profiles: StoreOperatingProfil
     <div className="reforecast-layout">
       <section className="panel reforecast-store-list">
         <SectionTitle eyebrow="STORE PHASE" title="店舗フェーズ" />
-        {profiles.map((profile) => { const forecast = calculateOperatingForecast(profile); return <button key={profile.storeId} className={selectedProfile.storeId === profile.storeId ? "active" : ""} onClick={() => setSelectedProfileId(profile.storeId)}><span><i className={cx("phase-dot", `phase-${profile.phase}`)} />{profile.storeName}<small>{phaseLabel(profile.phase)}</small></span><strong className={forecast.grossProfit < 0 ? "negative-text" : ""}>{yen.format(forecast.grossProfit)}</strong></button>; })}
+        {profiles.map((profile) => { const forecast = calculateOperatingForecast(profile); return <button key={profile.storeId} className={selectedProfile.storeId === profile.storeId ? "active" : ""} onClick={() => setSelectedProfileId(profile.storeId)}><span><i className={cx("phase-dot", `phase-${profile.phase}`)} />{profile.storeName}<small>{phaseLabel(profile.phase)}{profile.useDirectFinancials ? "／直接入力" : ""}</small></span><strong className={forecast.grossProfit < 0 ? "negative-text" : ""}>{yen.format(forecast.grossProfit)}</strong></button>; })}
       </section>
 
       <section className="panel service-editor">
@@ -510,6 +524,17 @@ function ActualsView({ profiles, setProfiles }: { profiles: StoreOperatingProfil
             <strong>{yen.format(calculateServiceRevenue(service))}{service.billingPricingNote ? <small>{service.billingPricingNote}</small> : service.billingUnitPrice != null ? <small>{yen.format(service.billingUnitPrice)}／実台</small> : null}</strong>
             <strong>{yen.format(calculateServiceVariableCost(service))}{service.outsourcingPricingNote ? <small>{service.outsourcingPricingNote}</small> : service.outsourcingUnitPrice != null ? <small>{yen.format(service.outsourcingUnitPrice)}／実台</small> : null}</strong>
           </div>)}
+        </div>
+        <div className={cx("direct-financial-editor", selectedProfile.useDirectFinancials && "active")}>
+          <div className="direct-financial-heading">
+            <label><input type="checkbox" checked={Boolean(selectedProfile.useDirectFinancials)} onChange={(event) => toggleDirectFinancials(event.target.checked)} /><span>店舗合計を直接入力</span></label>
+            <small>{selectedProfile.useDirectFinancials ? "直接入力した売上・原価を優先" : "現在は業務別台数から自動計算"}</small>
+          </div>
+          <div className="form-grid">
+            <NumberInput label="再予測売上" value={selectedProfile.useDirectFinancials ? selectedProfile.directRevenue ?? 0 : selectedForecast.revenue} onChange={(value) => updateProfile({ directRevenue: value })} suffix="円／月" step={10_000} disabled={!selectedProfile.useDirectFinancials} />
+            <NumberInput label="再予測直接原価" value={selectedProfile.useDirectFinancials ? selectedProfile.directCost ?? 0 : selectedForecast.directCost} onChange={(value) => updateProfile({ directCost: value })} suffix="円／月" step={10_000} disabled={!selectedProfile.useDirectFinancials} />
+          </div>
+          <p>直接入力中も業務別台数・単価は参考値として保持されます。チェックを外すと自動計算へ戻ります。</p>
         </div>
         <div className="forecast-result-strip"><div><span>修正売上</span><strong>{yen.format(selectedForecast.revenue)}</strong></div><div><span>固定＋変動原価</span><strong>{yen.format(selectedForecast.directCost)}</strong></div><div><span>直接粗利</span><strong className={selectedForecast.grossProfit < 0 ? "negative-text" : ""}>{yen.format(selectedForecast.grossProfit)}</strong></div><div><span>粗利率</span><strong>{percent.format(selectedForecast.grossMargin)}</strong></div></div>
       </section>
@@ -618,7 +643,17 @@ function CashFlowView({ months, setMonths, mode, setMode, flow, simultaneous, ph
   </>;
 }
 
-function SimulatorView({ inputs, updateInputs, expansion, settings, setSettings }: any) {
+type SimulatorViewProps = {
+  inputs: ExpansionInputs;
+  updateInputs: <K extends keyof ExpansionInputs>(key: K, value: ExpansionInputs[K]) => void;
+  expansion: ReturnType<typeof calculateExpansionSimulation>;
+  settings: SimulationSettings;
+  setSettings: React.Dispatch<React.SetStateAction<SimulationSettings>>;
+  paybackMonthsOverride: number | null;
+  setPaybackMonthsOverride: React.Dispatch<React.SetStateAction<number | null>>;
+};
+
+function SimulatorView({ inputs, updateInputs, expansion, settings, setSettings, paybackMonthsOverride, setPaybackMonthsOverride }: SimulatorViewProps) {
   const scenarios = [
     { name: "保守", finishing: 120, wash: 500, recheck: 50, workers: 1 },
     { name: "標準", finishing: 150, wash: 300, recheck: 70, workers: 1 },
@@ -635,7 +670,7 @@ function SimulatorView({ inputs, updateInputs, expansion, settings, setSettings 
         <h3>仕上げ構成比</h3><div className="form-grid three"><NumberInput label="簡易" value={inputs.simpleShare * 100} onChange={(value) => updateShare("simpleShare", value)} suffix="%" /><NumberInput label="通常" value={inputs.normalShare * 100} onChange={(value) => updateShare("normalShare", value)} suffix="%" /><NumberInput label="汚れ" value={inputs.dirtyShare * 100} onChange={(value) => updateShare("dirtyShare", value)} suffix="%" /></div>
         <h3>契約条件</h3><div className="form-grid"><NumberInput label="リチェック＋登録 請求単価" value={settings.pricing.client.recheck} onChange={(value) => setSettings((current: SimulationSettings) => ({ ...current, pricing: { ...current.pricing, client: { ...current.pricing.client, recheck: value } } }))} suffix="円／台" step={100} /><NumberInput label="撮影 請求単価" value={settings.pricing.client.photo} onChange={(value) => setSettings((current: SimulationSettings) => ({ ...current, pricing: { ...current.pricing, client: { ...current.pricing.client, photo: value } } }))} suffix="円／台" step={100} /><SelectField label="表示税区分" value={settings.taxMode} onChange={(value) => setSettings((current: SimulationSettings) => ({ ...current, taxMode: value as TaxMode }))}><option value="taxExclusive">契約税抜ベース</option><option value="taxIncluded">契約税込ベース</option></SelectField></div>
       </section>
-      <section className="sim-results"><div className="result-hero"><span>アッタ初年度キャッシュ利益</span><strong>{yen.format(expansion.firstYearCashProfit)}</strong><small>初期投資 {yen.format(expansion.starterKitInvestment)} 控除後</small></div><div className="result-grid"><div><span>月間売上</span><strong>{yen.format(expansion.monthlyAttaRevenue)}</strong></div><div><span>月間直接粗利</span><strong>{yen.format(expansion.monthlyAttaGrossProfit)}</strong></div><div><span>投資回収</span><strong>{number.format(expansion.paybackMonths)}か月</strong></div><div><span>必要スタッフ</span><strong>{expansion.workers.total}名</strong></div><div><span>NaS用具費/月</span><strong>{yen.format(expansion.monthlyNasSupplyCost)}</strong></div><div><span>NaS用具費後利益</span><strong>{yen.format(expansion.monthlyNasContributionProfit)}</strong></div></div><div className="calculation-note"><span>1店舗あたり</span><p>売上 <strong>{yen.format(expansion.perStore.attaRevenue)}</strong> ／ 直接粗利 <strong>{yen.format(expansion.perStore.attaGrossProfit)}</strong></p><p>スターターキット <strong>{yen.format(settings.operatingCosts.attaStarterKitCostPerStore)}</strong> ／ NaS用具費 <strong>{yen.format(settings.operatingCosts.nasMonthlySupplyCostPerStore)}/月</strong></p></div></section>
+      <section className="sim-results"><div className="result-hero"><span>アッタ初年度キャッシュ利益</span><strong>{yen.format(expansion.firstYearCashProfit)}</strong><small>初期投資 {yen.format(expansion.starterKitInvestment)} 控除後</small></div><div className="result-grid"><div><span>月間売上</span><strong>{yen.format(expansion.monthlyAttaRevenue)}</strong></div><div><span>月間直接粗利</span><strong>{yen.format(expansion.monthlyAttaGrossProfit)}</strong></div><div><span>投資回収</span><strong>{number.format(paybackMonthsOverride ?? expansion.paybackMonths)}か月</strong><small>{paybackMonthsOverride == null ? "自動計算" : "直接入力"}</small></div><div><span>必要スタッフ</span><strong>{expansion.workers.total}名</strong></div><div><span>NaS用具費/月</span><strong>{yen.format(expansion.monthlyNasSupplyCost)}</strong></div><div><span>NaS用具費後利益</span><strong>{yen.format(expansion.monthlyNasContributionProfit)}</strong></div></div><div className={cx("payback-editor", paybackMonthsOverride != null && "active")}><div><label><input type="checkbox" checked={paybackMonthsOverride != null} onChange={(event) => setPaybackMonthsOverride(event.target.checked ? expansion.paybackMonths : null)} /><span>投資回収月数を直接入力</span></label><small>{paybackMonthsOverride == null ? "スターターキット投資 ÷ 1店舗当たり月間直接粗利" : "入力値をサマリーにも反映"}</small></div><NumberInput label="投資回収月数" value={paybackMonthsOverride ?? expansion.paybackMonths} onChange={(value) => setPaybackMonthsOverride(value)} suffix="か月" step={0.1} disabled={paybackMonthsOverride == null} /></div><div className="calculation-note"><span>1店舗あたり</span><p>売上 <strong>{yen.format(expansion.perStore.attaRevenue)}</strong> ／ 直接粗利 <strong>{yen.format(expansion.perStore.attaGrossProfit)}</strong></p><p>スターターキット <strong>{yen.format(settings.operatingCosts.attaStarterKitCostPerStore)}</strong> ／ NaS用具費 <strong>{yen.format(settings.operatingCosts.nasMonthlySupplyCostPerStore)}/月</strong></p></div></section>
     </div>
     <section className="panel"><SectionTitle eyebrow="GROWTH CURVE" title="新規店舗数とアッタ累積キャッシュ（12か月）" /><BarComparison rows={[1, 3, 5, 7, 10].map((count) => { const result = calculateExpansionSimulation({ ...inputs, storeCount: count }, settings); return { label: `${count}店舗`, primary: result.firstYearCashProfit, accent: "blue" as const }; })} /></section>
     <SectionTitle eyebrow="SCENARIO COMPARISON" title="保守・標準・高稼働ケース" />

@@ -254,3 +254,15 @@ test("最低保証は変動費を下回る場合だけ原価へ反映する", ()
   assert.equal(result.directCost, 376_400);
   assert.equal(result.grossProfit, -376_400);
 });
+
+test("店舗別の売上・直接原価を直接入力した場合は自動計算より優先する", () => {
+  const soka = structuredClone(initialOperatingProfiles.find((profile) => profile.storeId === "soka"));
+  soka.useDirectFinancials = true;
+  soka.directRevenue = 1_234_000;
+  soka.directCost = 765_000;
+  const result = calculateOperatingForecast(soka);
+  assert.equal(result.revenue, 1_234_000);
+  assert.equal(result.directCost, 765_000);
+  assert.equal(result.grossProfit, 469_000);
+  assert.equal(result.grossMargin, 469_000 / 1_234_000);
+});
