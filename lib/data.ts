@@ -73,7 +73,7 @@ export const stores: Store[] = [
     recheckCount: 0,
     recheckWorkers: 0,
     recheckSlots: 0,
-    clientNormalFinishingPrice: 7_500,
+    clientNormalFinishingPrice: 8_250,
     directFinishingCostPerUnit: 3_800,
     directPhotoCostPerUnit: 1_500,
     directWashCostPerUnit: 220,
@@ -81,7 +81,7 @@ export const stores: Store[] = [
     starterKitInstalled: true,
     starterKitCost: 600_000,
     openingMonth: "既存店（支出済み）",
-    notes: ["通常仕上げ8,250円（税込）／7,500円（税抜）", "仕上げ専任と撮影専任の分業", "仕上げ180台・撮影150台を想定", "撮影請求2,000円／台・スタッフ委託費1,500円／台", "リチェック業務は対象外"],
+    notes: ["通常仕上げ請求8,250円／台・パートナー委託3,800円／台", "仕上げ専任と撮影専任の分業", "仕上げ180台・撮影150台を想定", "撮影請求2,000円／台・スタッフ委託費1,500円／台", "リチェック業務は対象外"],
     opportunities: ["撮影150台超の場合の人員・報酬条件を再設計", "仕上げと撮影の稼働差を継続監視"],
   },
   {

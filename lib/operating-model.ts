@@ -124,7 +124,7 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     fixedCost: 0,
     minimumGuarantee: 376_400,
     services: [
-      unitPricedService("finishing", "仕上げ", 200, 155, 5_600, 4_400),
+      unitPricedService("finishing", "仕上げ", 200, 155, 8_800, 4_400),
       calibratedService("wash", "水洗い", 400, 134, 67_000, 95_000),
       unitPricedService("photo", "撮影", 100, 100, 2_000, 1_500),
       unitPricedService("recheck", "リチェック＋登録", 100, 100, 2_500, 2_000),
@@ -154,7 +154,7 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     fixedCost: 96,
     minimumGuarantee: 0,
     services: [
-      calibratedService("finishing", "仕上げ", 180, 143, 1_075_000, 811_500),
+      unitPricedService("finishing", "仕上げ", 180, 143, 8_250, 3_800),
       calibratedService("wash", "水洗い", 396.3, 277, 138_500, 60_940),
       decrementPricedService("photo", "撮影", 200, 181, 407_000, 1_695, 250_000, 1_250),
       unitPricedService("recheck", "リチェック＋登録", 65, 45, 2_500, 2_000),

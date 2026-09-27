@@ -55,10 +55,10 @@ test("一宮は仕上げ180台・撮影150台、撮影委託費1,500円で計算
   assert.equal(stores[1].finishingCount, 180);
   assert.equal(stores[1].photoCount, 150);
   assert.equal(calculateDirectPhotoStaffCost(stores[1]), 225_000);
-  assert.equal(stores[1].clientNormalFinishingPrice, 7500);
-  assert.equal(result.attaRevenue, 1_867_965);
+  assert.equal(stores[1].clientNormalFinishingPrice, 8250);
+  assert.equal(result.attaRevenue, 2_002_965);
   assert.equal(result.attaDirectCost, 996_186);
-  assert.equal(result.attaGrossProfit, 871_779);
+  assert.equal(result.attaGrossProfit, 1_006_779);
 });
 
 test("6店舗のMAX展示数を反映する", () => {
@@ -195,9 +195,9 @@ test("再予測は撮影・リチェックを実台数と新単価で別計算�
   assert.equal(shinsayama.services.find((service) => service.key === "recheck").capacityUnits * shinsayama.services.find((service) => service.key === "recheck").utilization, 113);
   assert.equal(shinsayama.services.find((service) => service.key === "recheck").outsourcingUnitPrice, 2_500);
   const result = summarizeOperatingForecast(initialOperatingProfiles);
-  assert.equal(result.revenue, 5_065_595);
-  assert.equal(result.directCost, 3_912_536);
-  assert.equal(result.grossProfit, 1_153_059);
+  assert.equal(result.revenue, 5_666_345);
+  assert.equal(result.directCost, 3_644_436);
+  assert.equal(result.grossProfit, 2_021_909);
 });
 
 test("大宮の仕上げは台数に応じて売上と委託費が増減する", () => {
