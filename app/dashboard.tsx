@@ -13,7 +13,6 @@ import { defaultExpansionInputs, operatingCostSettings, pricing, stores } from "
 import {
   actualPeriods,
   august2026Actual,
-  august2026Summary,
   july2026Actual,
   july2026Summary,
   summarizeActual,
@@ -187,6 +186,7 @@ export default function Dashboard() {
   const [mobileNav, setMobileNav] = useState(false);
   const [inputs, setInputs] = useState<ExpansionInputs>({ ...defaultExpansionInputs });
   const [storeModels, setStoreModels] = useState<Store[]>(() => structuredClone(stores));
+  const [operatingProfiles, setOperatingProfiles] = useState<StoreOperatingProfile[]>(() => structuredClone(initialOperatingProfiles));
   const [settings, setSettings] = useState<SimulationSettings>({
     taxMode: "taxExclusive",
     taxRate: 0.1,
@@ -202,19 +202,26 @@ export default function Dashboard() {
   const cashFlow = deploymentMode === "simultaneous" ? simultaneous : phased;
   const simSummary = summarizeCashFlow(simultaneous);
   const phasedSummary = summarizeCashFlow(phased);
-  const totals = useMemo(() => financials.reduce((acc, item) => ({
-    attaRevenue: acc.attaRevenue + item.attaRevenue,
-    attaCost: acc.attaCost + item.attaDirectCost,
-    attaGross: acc.attaGross + item.attaGrossProfit,
-    nasRevenue: acc.nasRevenue + item.nasRevenue,
-    nasGross: acc.nasGross + item.nasGrossProfit,
-    nasSupply: acc.nasSupply + item.nasSupplyCost,
-    nasContribution: acc.nasContribution + item.nasContributionProfit,
-    finishing: acc.finishing + item.store.finishingCount,
-    photo: acc.photo + item.store.photoCount,
-    recheck: acc.recheck + item.store.recheckCount,
-  }), { attaRevenue: 0, attaCost: 0, attaGross: 0, nasRevenue: 0, nasGross: 0, nasSupply: 0, nasContribution: 0, finishing: 0, photo: 0, recheck: 0 }), [financials]);
-
+  const reforecast = useMemo(() => summarizeOperatingForecast(operatingProfiles), [operatingProfiles]);
+  const comparableActual = (actual: (typeof actualPeriods)[number]) => operatingProfiles.reduce((summary, profile) => {
+    const store = actual.stores.find((item) => item.id === profile.storeId);
+    summary.revenue += store?.revenue ?? 0;
+    summary.directCost += store?.outsourcingCost ?? 0;
+    summary.grossProfit += (store?.revenue ?? 0) - (store?.outsourcingCost ?? 0);
+    return summary;
+  }, { revenue: 0, directCost: 0, grossProfit: 0 });
+  const julyComparable = comparableActual(july2026Actual);
+  const augustComparable = comparableActual(august2026Actual);
+  const twoMonthAverage = {
+    revenue: (julyComparable.revenue + augustComparable.revenue) / 2,
+    directCost: (julyComparable.directCost + augustComparable.directCost) / 2,
+    grossProfit: (julyComparable.grossProfit + augustComparable.grossProfit) / 2,
+  };
+  const reforecastInventory = operatingProfiles.reduce((sum, profile) => sum + profile.inventoryUnits, 0);
+  const reforecastFinishing = operatingProfiles.reduce((sum, profile) => {
+    const service = profile.services.find((item) => item.key === "finishing");
+    return sum + (service?.enabled ? service.capacityUnits * service.utilization : 0);
+  }, 0);
   const updateInputs = <K extends keyof ExpansionInputs>(key: K, value: ExpansionInputs[K]) => setInputs((current) => ({ ...current, [key]: value }));
   const updateOperating = <K extends keyof SimulationSettings["operatingCosts"]>(key: K, value: SimulationSettings["operatingCosts"][K]) => setSettings((current) => ({ ...current, operatingCosts: { ...current.operatingCosts, [key]: value } }));
   const updatePrice = (group: keyof Pricing, key: string, value: number) => setSettings((current) => ({
@@ -252,33 +259,33 @@ export default function Dashboard() {
           {tab === "summary" ? (
             <>
               <section className="hero-row">
-                <div><span className="eyebrow">EXECUTIVE SUMMARY</span><h1>収益と投資を、同じ画面で判断する。</h1><p>対象{stores.length}店舗の直接粗利に、新規出店のスターターキット投資とNaSの継続用具費を重ねて確認できます。</p></div>
-                <div className="hero-badge"><span>現在</span><strong>{stores.length}</strong><small>対象店舗</small><i>うちNaS管理 {currentNasStores}店舗</i></div>
+                <div><span className="eyebrow">PERFORMANCE SUMMARY</span><h1>7月・8月実績と、現在の再予測。</h1><p>再予測で変更した条件はページを移動しても保持され、サマリーへ即時反映されます。</p></div>
+                <div className="hero-badge"><span>再予測対象</span><strong>{operatingProfiles.length}</strong><small>店舗</small><i>7月・8月実績を基準</i></div>
               </section>
 
               <section className="metric-grid primary-metrics">
-                <MetricCard label="アッタ月間売上" value={yen.format(totals.attaRevenue)} helper={`年間 ${compactYen(totals.attaRevenue * 12)}`} formula={`${stores.length}店舗のガリバー売上合計`} />
-                <MetricCard label="アッタ月間直接粗利" value={yen.format(totals.attaGross)} helper={`直接粗利率 ${percent.format(totals.attaGross / totals.attaRevenue)}`} tone="blue" formula="売上 − 管理パートナーまたは直接スタッフ支払" />
-                <MetricCard label="NaS月間受取" value={yen.format(totals.nasRevenue)} helper={`NaS管理${currentNasStores}店舗のみ`} tone="cyan" />
-                <MetricCard label="NaS用具費控除後利益" value={yen.format(totals.nasContribution)} helper={`利益率 ${percent.format(totals.nasContribution / totals.nasRevenue)}`} tone="green" formula={`NaS直接粗利 − ${currentNasStores}店舗 × 月間用具費`} />
+                <MetricCard label="7月実績売上" value={yen.format(julyComparable.revenue)} helper={`対象6店舗／直接粗利 ${yen.format(julyComparable.grossProfit)}`} tone="blue" />
+                <MetricCard label="8月実績売上" value={yen.format(augustComparable.revenue)} helper={`対象6店舗／直接粗利 ${yen.format(augustComparable.grossProfit)}`} tone="violet" />
+                <MetricCard label="現在の再予測売上" value={yen.format(reforecast.revenue)} helper={`7–8月平均比 ${reforecast.revenue >= twoMonthAverage.revenue ? "+" : "−"}${yen.format(Math.abs(reforecast.revenue - twoMonthAverage.revenue))}`} tone="cyan" formula="再予測で設定した店舗別・業務別台数から計算" />
+                <MetricCard label="現在の再予測直接粗利" value={yen.format(reforecast.grossProfit)} helper={`粗利率 ${percent.format(reforecast.grossMargin)}`} tone={reforecast.grossProfit >= 0 ? "green" : "amber"} formula="再予測売上 − 固定費・最低保証・台数連動委託費" />
               </section>
               <section className="operations-strip">
-                <div><span>月間仕上げ</span><strong>{number.format(totals.finishing)}台</strong></div>
-                <div><span>月間撮影</span><strong>{number.format(totals.photo)}台</strong></div>
-                <div><span>月間リチェック</span><strong>{number.format(totals.recheck)}台</strong></div>
-                <div><span>NaS月間用具費（既存）</span><strong>{yen.format(totals.nasSupply)}</strong></div>
-                <div><span>NaS年間用具費（既存）</span><strong>{yen.format(totals.nasSupply * 12)}</strong></div>
+                <div><span>実在庫数</span><strong>{number.format(reforecastInventory)}台</strong></div>
+                <div><span>対象仕上げ台数</span><strong>{number.format(reforecastFinishing)}台</strong></div>
+                <div><span>仕上げ対象率</span><strong>{percent.format(reforecastInventory ? reforecastFinishing / reforecastInventory : 0)}</strong></div>
+                <div><span>再予測直接原価</span><strong>{yen.format(reforecast.directCost)}</strong></div>
+                <div><span>7–8月平均売上</span><strong>{yen.format(twoMonthAverage.revenue)}</strong></div>
               </section>
 
               <section className="actual-summary-banner">
-                <div className="actual-summary-heading"><span>2026年8月 暫定実績</span><strong>シミュレーション比と前月差を確認</strong><button onClick={() => setTab("actuals")}>実績詳細を見る →</button></div>
-                <div><span>税抜売上</span><strong>{yen.format(august2026Actual.revenue)}</strong></div>
-                <div><span>売上達成率</span><strong>{percent.format(august2026Summary.revenueAttainment)}</strong></div>
-                <div><span>直接粗利</span><strong>{yen.format(august2026Summary.grossProfit)}</strong></div>
-                <div><span>粗利達成率</span><strong>{percent.format(august2026Summary.grossProfitAttainment)}</strong></div>
+                <div className="actual-summary-heading"><span>現在の再予測条件</span><strong>実績との差と採算を確認</strong><button onClick={() => setTab("actuals")}>再予測を編集する →</button></div>
+                <div><span>7–8月平均売上</span><strong>{yen.format(twoMonthAverage.revenue)}</strong></div>
+                <div><span>平均売上との差</span><strong>{reforecast.revenue >= twoMonthAverage.revenue ? "+" : "−"}{yen.format(Math.abs(reforecast.revenue - twoMonthAverage.revenue))}</strong></div>
+                <div><span>再予測直接原価</span><strong>{yen.format(reforecast.directCost)}</strong></div>
+                <div><span>再予測粗利率</span><strong>{percent.format(reforecast.grossMargin)}</strong></div>
               </section>
 
-              <SectionTitle eyebrow="NEW STORE ECONOMICS" title={`追加${inputs.storeCount}店舗の投資・回収見通し`} action={<button className="text-button" onClick={() => setTab("simulator")}>条件を変更 →</button>} />
+              <SectionTitle eyebrow="SEPARATE EXPANSION MODEL" title={`新規出店（別試算）：追加${inputs.storeCount}店舗の投資・回収`} action={<button className="text-button" onClick={() => setTab("simulator")}>条件を変更 →</button>} />
               <section className="metric-grid secondary-metrics">
                 <MetricCard label="スターターキット投資額" value={yen.format(expansion.starterKitInvestment)} helper={`1店舗 ${yen.format(settings.operatingCosts.attaStarterKitCostPerStore)}`} tone="amber" />
                 <MetricCard label="投資回収月数" value={`${number.format(expansion.paybackMonths)}か月`} helper="1店舗当たり月間直接粗利で回収" tone="violet" />
@@ -288,19 +295,19 @@ export default function Dashboard() {
 
               <div className="two-column">
                 <section className="panel">
-                  <SectionTitle eyebrow="STORE PERFORMANCE" title="店舗別 アッタ売上・直接粗利" />
-                  <div className="legend"><span><i className="legend-blue" />売上</span><span><i className="legend-amber" />直接粗利</span></div>
-                  <BarComparison rows={financials.map((item) => ({ label: item.store.shortName, primary: item.attaRevenue, secondary: item.attaGrossProfit }))} />
+                  <SectionTitle eyebrow="STORE REFORECAST" title="店舗別 再予測売上・直接粗利" />
+                  <div className="legend"><span><i className="legend-blue" />再予測売上</span><span><i className="legend-amber" />再予測直接粗利</span></div>
+                  <BarComparison rows={operatingProfiles.map((profile) => { const forecast = calculateOperatingForecast(profile); return { label: profile.storeName, primary: forecast.revenue, secondary: forecast.grossProfit }; })} />
                 </section>
                 <section className="panel">
-                  <SectionTitle eyebrow="PROFIT WATERFALL" title="三者間の金額の流れ" />
+                  <SectionTitle eyebrow="REFORECAST PROFIT" title="再予測の売上から直接粗利まで" />
                   <div className="money-flow">
-                    <div><span>ガリバー支払</span><strong>{compactYen(totals.attaRevenue)}</strong></div><b>→</b>
-                    <div className="flow-atta"><span>アッタ直接粗利</span><strong>{compactYen(totals.attaGross)}</strong></div><b>＋</b>
-                    <div><span>NaS受取</span><strong>{compactYen(totals.nasRevenue)}</strong></div><b>→</b>
-                    <div className="flow-nas"><span>NaS用具費後</span><strong>{compactYen(totals.nasContribution)}</strong></div>
+                    <div><span>再予測売上</span><strong>{compactYen(reforecast.revenue)}</strong></div><b>−</b>
+                    <div><span>再予測直接原価</span><strong>{compactYen(reforecast.directCost)}</strong></div><b>＝</b>
+                    <div className="flow-atta"><span>再予測直接粗利</span><strong>{compactYen(reforecast.grossProfit)}</strong></div><b>↔</b>
+                    <div className="flow-nas"><span>7–8月平均粗利</span><strong>{compactYen(twoMonthAverage.grossProfit)}</strong></div>
                   </div>
-                  <p className="panel-note">八王子・一宮は直接スタッフ支払、新狭山はLIVE COLORへの管理委託費としてアッタ原価に計上しています。</p>
+                  <p className="panel-note">再予測条件を変更すると、このサマリーと店舗別の売上・原価・粗利が同時に更新されます。</p>
                 </section>
               </div>
 
@@ -325,7 +332,7 @@ export default function Dashboard() {
             </>
           ) : null}
 
-          {tab === "actuals" ? <ActualsView /> : null}
+          {tab === "actuals" ? <ActualsView profiles={operatingProfiles} setProfiles={setOperatingProfiles} /> : null}
           {tab === "stores" ? <StoresView financials={financials} selected={selectedFinancial} setSelected={setSelectedStore} settings={settings} /> : null}
           {tab === "cashflow" ? <CashFlowView months={cashMonths} setMonths={setCashMonths} mode={deploymentMode} setMode={setDeploymentMode} flow={cashFlow} simultaneous={simultaneous} phased={phased} simSummary={simSummary} phasedSummary={phasedSummary} investment={expansion.starterKitInvestment} /> : null}
           {tab === "simulator" ? <SimulatorView inputs={inputs} updateInputs={updateInputs} expansion={expansion} settings={settings} setSettings={setSettings} /> : null}
@@ -412,8 +419,7 @@ function ActualHistoryView() {
   </>;
 }
 
-function ActualsView() {
-  const [profiles, setProfiles] = useState<StoreOperatingProfile[]>(() => structuredClone(initialOperatingProfiles));
+function ActualsView({ profiles, setProfiles }: { profiles: StoreOperatingProfile[]; setProfiles: React.Dispatch<React.SetStateAction<StoreOperatingProfile[]>> }) {
   const [selectedProfileId, setSelectedProfileId] = useState(initialOperatingProfiles[0].storeId);
   const [resetNotice, setResetNotice] = useState(false);
   const revised = useMemo(() => summarizeOperatingForecast(profiles), [profiles]);
