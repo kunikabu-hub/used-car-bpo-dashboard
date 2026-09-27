@@ -9,6 +9,8 @@ export type ServiceOperatingAssumption = {
   utilization: number;
   capacityRevenue: number;
   capacityVariableCost: number;
+  billingUnitPrice?: number;
+  outsourcingUnitPrice?: number;
 };
 
 export type StoreOperatingProfile = {
@@ -20,6 +22,25 @@ export type StoreOperatingProfile = {
   services: ServiceOperatingAssumption[];
   note: string;
 };
+
+const unitPricedService = (
+  key: "photo" | "recheck",
+  label: string,
+  capacityUnits: number,
+  actualUnits: number,
+  billingUnitPrice: number,
+  outsourcingUnitPrice: number,
+): ServiceOperatingAssumption => ({
+  key,
+  label,
+  enabled: actualUnits > 0,
+  capacityUnits,
+  utilization: capacityUnits > 0 ? actualUnits / capacityUnits : 0,
+  capacityRevenue: capacityUnits * billingUnitPrice,
+  capacityVariableCost: capacityUnits * outsourcingUnitPrice,
+  billingUnitPrice,
+  outsourcingUnitPrice,
+});
 
 const calibratedService = (
   key: ServiceKey,
@@ -63,9 +84,10 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     services: [
       calibratedService("finishing", "仕上げ", 200, 216, 1_208_000, 379_500),
       calibratedService("wash", "水洗い", 400, 134, 67_000, 95_000),
-      calibratedService("recheck", "撮影・リチェック", 100, 50, 152_609, 132_400),
+      unitPricedService("photo", "撮影", 100, 100, 2_000, 1_500),
+      unitPricedService("recheck", "リチェック＋登録", 100, 100, 2_500, 2_000),
     ],
-    note: "仕上げは計画超過、水洗いと撮影・リチェックに余力。最低保証を分離。",
+    note: "撮影・リチェック＋登録は換算せず実台数で計算。最低保証を分離。",
   },
   {
     storeId: "omiya",
@@ -76,10 +98,10 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     services: [
       calibratedService("finishing", "仕上げ", 130, 0, 0, 0),
       calibratedService("wash", "水洗い", 260, 0, 0, 0),
-      calibratedService("photo", "撮影", 130, 0, 0, 0),
-      calibratedService("recheck", "リチェック", 100, 25.5, 140_317, 0),
+      unitPricedService("photo", "撮影", 130, 0, 2_000, 1_500),
+      unitPricedService("recheck", "リチェック＋登録", 100, 51, 2_500, 2_500),
     ],
-    note: "7月はリチェック中心。担当者確保費を固定費として扱う。",
+    note: "7月はリチェック＋登録51台。上荒磯委託費2,500円／実台、担当者確保費は固定費。",
   },
   {
     storeId: "ichinomiya",
@@ -90,10 +112,10 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     services: [
       calibratedService("finishing", "仕上げ", 180, 143, 1_075_000, 811_500),
       calibratedService("wash", "水洗い", 396.3, 277, 138_500, 60_940),
-      calibratedService("photo", "撮影", 150, 90.5, 340_712, 0),
-      calibratedService("registration", "登録関連", 65, 45, 210_358, 201_500),
+      unitPricedService("photo", "撮影", 150, 181, 2_000, 1_500),
+      unitPricedService("recheck", "リチェック＋登録", 65, 45, 2_500, 2_000),
     ],
-    note: "通常仕上げ8,250円（税込）を基準。登録業務を独立し、撮影スタッフ費は請求確定時に固定費または最低保証へ追加。",
+    note: "撮影181台、リチェック＋登録45台を実台数で計算。通常仕上げ8,250円（税込）を基準。",
   },
   {
     storeId: "shinsayama",
@@ -103,9 +125,10 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     minimumGuarantee: 0,
     services: [
       calibratedService("finishing", "仕上げ", 180, 77, 621_000, 0),
-      calibratedService("recheck", "リチェック", 100, 53.5, 226_641, 268_000),
+      unitPricedService("photo", "撮影", 180, 0, 2_000, 1_500),
+      unitPricedService("recheck", "リチェック＋登録", 100, 107, 2_500, 2_500),
     ],
-    note: "LIVE COLOR費を固定費、上荒磯リチェックを変動費として分離。水洗いなし。",
+    note: "LIVE COLOR費を固定費、上荒磯のリチェック＋登録107台を2,500円／実台で計算。水洗いなし。",
   },
   {
     storeId: "tsukuba",
@@ -116,7 +139,8 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
     services: [
       { key: "finishing", label: "仕上げ", enabled: true, capacityUnits: 150, utilization: 0, capacityRevenue: 1_320_000, capacityVariableCost: 675_000 },
       { key: "wash", label: "水洗い", enabled: true, capacityUnits: 300, utilization: 0, capacityRevenue: 165_000, capacityVariableCost: 90_000 },
-      { key: "recheck", label: "リチェック", enabled: true, capacityUnits: 70, utilization: 0, capacityRevenue: 223_541.6666825, capacityVariableCost: 140_000 },
+      unitPricedService("photo", "撮影", 150, 0, 2_000, 1_500),
+      unitPricedService("recheck", "リチェック＋登録", 70, 0, 2_500, 2_500),
     ],
     note: "開設前。開設月が確定するまで売上・原価とも0円。撮影なし。",
   },

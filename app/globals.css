@@ -155,6 +155,8 @@ main { min-width: 0; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: var(--amber); }.status-dot.actual { background: var(--blue); }.status-dot.transition { background: var(--amber); }.status-dot.forecast { background: var(--violet); }
 .detail-grid { display: grid; grid-template-columns: 1.4fr .7fr; gap: 15px; }
 .actual-store-detail { margin-top: 14px; }
+.pricing-rule { border-left: 3px solid var(--blue); color: var(--navy) !important; }
+.service-assumption > strong small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; font-weight: 500; white-space: nowrap; }
 .store-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }.store-header h1 { margin: 8px 0 3px; color: var(--navy); font-size: 23px; }.store-header p { margin: 0; color: var(--muted); font-size: 11px; }
 .category-label { font-size: 9px; padding: 4px 7px; border-radius: 4px; background: #e9f3fa; color: var(--blue); font-weight: 700; }.category-label.transition { color: #9a691e; background: #fff2d8; }.category-label.forecast { color: var(--violet); background: #efecfb; }
 .inventory { text-align: center; min-width: 80px; border-left: 1px solid var(--line); }.inventory strong { display: block; color: var(--navy); font: 700 28px var(--font-roboto), sans-serif; }.inventory span { font-size: 9px; color: var(--muted); }

@@ -22,6 +22,7 @@ test("管理ダッシュボードをサーバー描画する", async () => {
   assert.match(html, /売上達成率/);
   assert.match(html, /実台数×2,500円/);
   assert.doesNotMatch(html, /リチェック換算率/);
+  assert.doesNotMatch(html, /撮影・リチェック<\/span>/);
   assert.match(html, /直接粗利率/);
   assert.match(html, /実績・再予測/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);

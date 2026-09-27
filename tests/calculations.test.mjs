@@ -160,12 +160,30 @@ test("2026年8月実績と保存済みシミュレーションの達成率を集
   assert.ok(Math.abs(august2026Summary.grossProfitAttainment - 3_067_410 / 5_542_831) < 1e-12);
 });
 
-test("業務別稼働率モデルの初期値は比較対象店舗の7月実績と一致する", () => {
+test("再予測は撮影・リチェックを実台数と新単価で別計算する", () => {
+  const soka = initialOperatingProfiles.find((profile) => profile.storeId === "soka");
+  const omiya = initialOperatingProfiles.find((profile) => profile.storeId === "omiya");
+  const shinsayama = initialOperatingProfiles.find((profile) => profile.storeId === "shinsayama");
+  assert.deepEqual(
+    soka.services.filter((service) => service.key === "photo" || service.key === "recheck").map((service) => ({
+      key: service.key,
+      units: service.capacityUnits * service.utilization,
+      billingUnitPrice: service.billingUnitPrice,
+      outsourcingUnitPrice: service.outsourcingUnitPrice,
+    })),
+    [
+      { key: "photo", units: 100, billingUnitPrice: 2_000, outsourcingUnitPrice: 1_500 },
+      { key: "recheck", units: 100, billingUnitPrice: 2_500, outsourcingUnitPrice: 2_000 },
+    ],
+  );
+  assert.equal(omiya.services.find((service) => service.key === "recheck").capacityUnits * omiya.services.find((service) => service.key === "recheck").utilization, 51);
+  assert.equal(omiya.services.find((service) => service.key === "recheck").outsourcingUnitPrice, 2_500);
+  assert.equal(shinsayama.services.find((service) => service.key === "recheck").capacityUnits * shinsayama.services.find((service) => service.key === "recheck").utilization, 107);
+  assert.equal(shinsayama.services.find((service) => service.key === "recheck").outsourcingUnitPrice, 2_500);
   const result = summarizeOperatingForecast(initialOperatingProfiles);
-  assert.equal(result.revenue, 4_774_637);
-  assert.equal(result.directCost, 3_107_036);
-  assert.equal(result.grossProfit, 1_667_601);
-  assert.ok(Math.abs(result.grossMargin - 0.34926236277229034) < 1e-12);
+  assert.equal(result.revenue, 5_023_500);
+  assert.equal(result.directCost, 3_611_636);
+  assert.equal(result.grossProfit, 1_411_864);
 });
 
 test("未開設店舗は稼働率を設定しても売上・原価を計上しない", () => {
