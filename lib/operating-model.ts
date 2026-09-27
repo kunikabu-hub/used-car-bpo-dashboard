@@ -24,6 +24,7 @@ export type ServiceOperatingAssumption = {
 export type StoreOperatingProfile = {
   storeId: string;
   storeName: string;
+  inventoryUnits: number;
   phase: StorePhase;
   fixedCost: number;
   minimumGuarantee: number;
@@ -102,6 +103,7 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
   {
     storeId: "hachioji",
     storeName: "八王子",
+    inventoryUnits: 200,
     phase: "stable",
     fixedCost: 0,
     minimumGuarantee: 0,
@@ -114,34 +116,37 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
   {
     storeId: "soka",
     storeName: "草加",
+    inventoryUnits: 250,
     phase: "stable",
     fixedCost: 0,
     minimumGuarantee: 376_400,
     services: [
-      calibratedService("finishing", "仕上げ", 200, 216, 1_208_000, 379_500),
+      unitPricedService("finishing", "仕上げ", 200, 155, 5_600, 4_400),
       calibratedService("wash", "水洗い", 400, 134, 67_000, 95_000),
       unitPricedService("photo", "撮影", 100, 100, 2_000, 1_500),
       unitPricedService("recheck", "リチェック＋登録", 100, 100, 2_500, 2_000),
     ],
-    note: "撮影・リチェック＋登録は換算せず実台数で計算。最低保証を分離。",
+    note: "仕上げは7月216台・8月93台の2か月平均を初期値に設定。委託費4,400円／対象台数、最低保証は分離。",
   },
   {
     storeId: "omiya",
     storeName: "大宮",
+    inventoryUnits: 150,
     phase: "ramp",
     fixedCost: 294_500,
     minimumGuarantee: 0,
     services: [
-      unitPricedService("finishing", "仕上げ", 130, 0, 8_800, 4_500, true),
+      unitPricedService("finishing", "仕上げ", 130, 7, 8_800, 4_950, true),
       calibratedService("wash", "水洗い", 260, 0, 0, 0),
       unitPricedService("photo", "撮影", 130, 0, 2_000, 1_500),
-      unitPricedService("recheck", "リチェック＋登録", 100, 51, 2_500, 2_500),
+      unitPricedService("recheck", "リチェック＋登録", 100, 68, 2_500, 2_500),
     ],
-    note: "7月はリチェック＋登録51台。上荒磯委託費2,500円／実台、担当者確保費は固定費。",
+    note: "仕上げは7月0台・8月14台、リチェック＋登録は7月51台・8月85台の2か月平均を初期値に設定。",
   },
   {
     storeId: "ichinomiya",
     storeName: "一宮",
+    inventoryUnits: 300,
     phase: "ramp",
     fixedCost: 96,
     minimumGuarantee: 0,
@@ -156,24 +161,26 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
   {
     storeId: "shinsayama",
     storeName: "新狭山",
+    inventoryUnits: 200,
     phase: "ramp",
-    fixedCost: 593_000,
+    fixedCost: 0,
     minimumGuarantee: 0,
     services: [
-      calibratedService("finishing", "仕上げ", 180, 77, 621_000, 0),
+      unitPricedService("finishing", "仕上げ", 180, 99, 8_800, 5_500),
       unitPricedService("photo", "撮影", 180, 0, 2_000, 1_500),
-      unitPricedService("recheck", "リチェック＋登録", 100, 107, 2_500, 2_500),
+      unitPricedService("recheck", "リチェック＋登録", 120, 113, 2_500, 2_500),
     ],
-    note: "LIVE COLOR費を固定費、上荒磯のリチェック＋登録107台を2,500円／実台で計算。水洗いなし。",
+    note: "仕上げ委託費は固定費ではなく5,500円／対象台数。リチェック＋登録は7月107台・8月118台の平均を初期値に設定。水洗いなし。",
   },
   {
     storeId: "tsukuba",
     storeName: "つくば",
+    inventoryUnits: 150,
     phase: "unopened",
     fixedCost: 0,
     minimumGuarantee: 0,
     services: [
-      { key: "finishing", label: "仕上げ", enabled: true, capacityUnits: 150, utilization: 0, capacityRevenue: 1_320_000, capacityVariableCost: 675_000 },
+      { key: "finishing", label: "仕上げ", enabled: true, capacityUnits: 150, utilization: 0, capacityRevenue: 1_320_000, capacityVariableCost: 742_500, billingUnitPrice: 8_800, outsourcingUnitPrice: 4_950 },
       { key: "wash", label: "水洗い", enabled: true, capacityUnits: 300, utilization: 0, capacityRevenue: 165_000, capacityVariableCost: 90_000 },
       unitPricedService("photo", "撮影", 150, 0, 2_000, 1_500),
       unitPricedService("recheck", "リチェック＋登録", 70, 0, 2_500, 2_500),

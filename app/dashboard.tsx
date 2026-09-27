@@ -325,7 +325,7 @@ export default function Dashboard() {
             </>
           ) : null}
 
-          {tab === "actuals" ? <ActualsView financials={financials} /> : null}
+          {tab === "actuals" ? <ActualsView /> : null}
           {tab === "stores" ? <StoresView financials={financials} selected={selectedFinancial} setSelected={setSelectedStore} settings={settings} /> : null}
           {tab === "cashflow" ? <CashFlowView months={cashMonths} setMonths={setCashMonths} mode={deploymentMode} setMode={setDeploymentMode} flow={cashFlow} simultaneous={simultaneous} phased={phased} simSummary={simSummary} phasedSummary={phasedSummary} investment={expansion.starterKitInvestment} /> : null}
           {tab === "simulator" ? <SimulatorView inputs={inputs} updateInputs={updateInputs} expansion={expansion} settings={settings} setSettings={setSettings} /> : null}
@@ -412,33 +412,40 @@ function ActualHistoryView() {
   </>;
 }
 
-function ActualsView({ financials }: { financials: StoreFinancials[] }) {
+function ActualsView() {
   const [profiles, setProfiles] = useState<StoreOperatingProfile[]>(() => structuredClone(initialOperatingProfiles));
   const [selectedProfileId, setSelectedProfileId] = useState(initialOperatingProfiles[0].storeId);
   const [resetNotice, setResetNotice] = useState(false);
   const revised = useMemo(() => summarizeOperatingForecast(profiles), [profiles]);
   const selectedProfile = profiles.find((profile) => profile.storeId === selectedProfileId) ?? profiles[0];
   const selectedForecast = calculateOperatingForecast(selectedProfile);
-  const planTotals = financials.reduce((summary, item) => ({
-    revenue: summary.revenue + item.attaRevenue,
-    directCost: summary.directCost + item.attaDirectCost,
-    grossProfit: summary.grossProfit + item.attaGrossProfit,
-  }), { revenue: 0, directCost: 0, grossProfit: 0 });
-  const comparableActual = july2026Actual.stores.filter((store) => store.id !== "tokorozawa").reduce((summary, store) => ({
-    revenue: summary.revenue + store.revenue,
-    directCost: summary.directCost + store.outsourcingCost,
-    grossProfit: summary.grossProfit + store.revenue - store.outsourcingCost,
-  }), { revenue: 0, directCost: 0, grossProfit: 0 });
+  const summarizeComparableActual = (actual: (typeof actualPeriods)[number]) => profiles.reduce((summary, profile) => {
+    const store = actual.stores.find((item) => item.id === profile.storeId);
+    summary.revenue += store?.revenue ?? 0;
+    summary.directCost += store?.outsourcingCost ?? 0;
+    summary.grossProfit += (store?.revenue ?? 0) - (store?.outsourcingCost ?? 0);
+    return summary;
+  }, { revenue: 0, directCost: 0, grossProfit: 0 });
+  const julyComparable = summarizeComparableActual(july2026Actual);
+  const augustComparable = summarizeComparableActual(august2026Actual);
+  const twoMonthAverage = {
+    revenue: (julyComparable.revenue + augustComparable.revenue) / 2,
+    directCost: (julyComparable.directCost + augustComparable.directCost) / 2,
+    grossProfit: (julyComparable.grossProfit + augustComparable.grossProfit) / 2,
+  };
   const updateProfile = (patch: Partial<StoreOperatingProfile>) => { setResetNotice(false); setProfiles((current) => current.map((profile) => profile.storeId === selectedProfile.storeId ? { ...profile, ...patch } : profile)); };
   const updateService = (key: ServiceOperatingAssumption["key"], patch: Partial<ServiceOperatingAssumption>) => { setResetNotice(false); setProfiles((current) => current.map((profile) => profile.storeId === selectedProfile.storeId ? { ...profile, services: profile.services.map((service) => service.key === key ? { ...service, ...patch } : service) } : profile)); };
   const resetProfiles = () => { setProfiles(structuredClone(initialOperatingProfiles)); setSelectedProfileId(initialOperatingProfiles[0].storeId); setResetNotice(true); };
   const phaseLabel = (phase: StorePhase) => phase === "unopened" ? "未開設" : phase === "ramp" ? "立ち上げ中" : "安定稼働";
-  const actualByStore = new Map(july2026Actual.stores.map((store) => [store.id, store]));
-  const planByStore = new Map(financials.map((item) => [item.store.id, item]));
+  const julyByStore = new Map(july2026Actual.stores.map((store) => [store.id, store]));
+  const augustByStore = new Map(august2026Actual.stores.map((store) => [store.id, store]));
+  const selectedFinishing = selectedProfile.services.find((service) => service.key === "finishing");
+  const selectedFinishingUnits = selectedFinishing?.enabled ? selectedFinishing.capacityUnits * selectedFinishing.utilization : 0;
+  const selectedCoverage = selectedProfile.inventoryUnits > 0 ? selectedFinishingUnits / selectedProfile.inventoryUnits : 0;
 
   return <>
     <ActualHistoryView />
-    <div className="reforecast-divider"><span>次回シミュレーション見直し</span><strong>実績を基に将来条件を更新</strong></div>
+    <div className="reforecast-divider"><span>再予測シミュレーション</span><strong>7月・8月実績を基に、在庫数と対象業務台数を分けて更新</strong></div>
     <section className="actual-hero legacy-actual">
       <div><span className="eyebrow">JULY 2026 ACTUAL</span><h1>7月実績</h1><p>請求データと業務委託費の店舗配賦を税抜で集計。予測モデルとは分離して表示しています。</p></div>
       <div className="utilization-ring"><strong>{percent.format(july2026Actual.utilizationRate)}</strong><span>推定稼働率</span></div>
@@ -458,12 +465,12 @@ function ActualsView({ financials }: { financials: StoreFinancials[] }) {
       <div><span>未稼働20%の売上余地</span><strong>{yen.format(july2026Summary.fullCapacityRevenue - july2026Actual.revenue)}</strong><small>80%稼働の単純換算</small></div>
     </section>
 
-    <SectionTitle eyebrow="REFORECAST MODEL" title="店舗フェーズ・業務別稼働率による修正予測" action={<div className="reset-action"><button className={cx("text-button", resetNotice && "reset-complete")} onClick={resetProfiles}>{resetNotice ? "✓ 初期値に戻しました" : "再予測条件を初期値に戻す"}</button><span aria-live="polite">{resetNotice ? "店舗フェーズ・稼働率・固定費・最低保証を7月実績ベースへ戻しました。" : "7月実績ベースの設定へ戻します"}</span></div>} />
+    <SectionTitle eyebrow="REFORECAST MODEL" title="7月・8月実績から組み直す再予測" action={<div className="reset-action"><button className={cx("text-button", resetNotice && "reset-complete")} onClick={resetProfiles}>{resetNotice ? "✓ 初期値に戻しました" : "再予測条件を初期値に戻す"}</button><span aria-live="polite">{resetNotice ? "7月・8月実績を基にした初期条件へ戻しました。" : "7月・8月実績ベースの設定へ戻します"}</span></div>} />
     <section className="metric-grid primary-metrics">
-      <MetricCard label="当初計画売上" value={yen.format(planTotals.revenue)} helper={`粗利 ${yen.format(planTotals.grossProfit)}`} tone="violet" />
-      <MetricCard label="比較対象7月売上" value={yen.format(comparableActual.revenue)} helper={`対象6店舗・所沢を除外／粗利 ${yen.format(comparableActual.grossProfit)}`} tone="blue" />
-      <MetricCard label="修正予測売上" value={yen.format(revised.revenue)} helper={`直接原価 ${yen.format(revised.directCost)}`} tone="cyan" />
-      <MetricCard label="修正予測直接粗利" value={yen.format(revised.grossProfit)} helper={`粗利率 ${percent.format(revised.grossMargin)}`} tone={revised.grossProfit >= 0 ? "green" : "amber"} />
+      <MetricCard label="7月実績売上" value={yen.format(julyComparable.revenue)} helper={`対象6店舗／粗利 ${yen.format(julyComparable.grossProfit)}`} tone="blue" />
+      <MetricCard label="8月実績売上" value={yen.format(augustComparable.revenue)} helper={`対象6店舗／粗利 ${yen.format(augustComparable.grossProfit)}`} tone="violet" />
+      <MetricCard label="再予測売上" value={yen.format(revised.revenue)} helper={`7–8月平均比 ${revised.revenue >= twoMonthAverage.revenue ? "+" : "−"}${yen.format(Math.abs(revised.revenue - twoMonthAverage.revenue))}`} tone="cyan" />
+      <MetricCard label="再予測直接粗利" value={yen.format(revised.grossProfit)} helper={`粗利率 ${percent.format(revised.grossMargin)}／2か月平均 ${yen.format(twoMonthAverage.grossProfit)}`} tone={revised.grossProfit >= 0 ? "green" : "amber"} />
     </section>
 
     <div className="reforecast-layout">
@@ -476,17 +483,24 @@ function ActualsView({ financials }: { financials: StoreFinancials[] }) {
         <div className="editor-heading"><div><span className="eyebrow">SERVICE UTILIZATION</span><h2>{selectedProfile.storeName}の修正条件</h2></div><span className={cx("phase-pill", `phase-${selectedProfile.phase}`)}>{phaseLabel(selectedProfile.phase)}</span></div>
         <div className="reforecast-settings">
           <SelectField label="店舗フェーズ" value={selectedProfile.phase} onChange={(value) => updateProfile({ phase: value as StorePhase })}><option value="unopened">未開設</option><option value="ramp">立ち上げ中</option><option value="stable">安定稼働</option></SelectField>
+          <NumberInput label="実在庫数" value={selectedProfile.inventoryUnits} onChange={(value) => updateProfile({ inventoryUnits: Math.max(0, value) })} suffix="台" step={1} />
           <NumberInput label="固定費" value={selectedProfile.fixedCost} onChange={(value) => updateProfile({ fixedCost: value })} suffix="円/月" step={1_000} />
           <NumberInput label="最低保証" value={selectedProfile.minimumGuarantee} onChange={(value) => updateProfile({ minimumGuarantee: value })} suffix="円/月" step={1_000} />
         </div>
         <p className="editor-note">{selectedProfile.note}</p>
-        <p className="editor-note pricing-rule">換算率・固定レンジは使用しません。撮影とリチェック＋登録は、それぞれの実台数 × 単価で計算します。</p>
+        <p className="editor-note pricing-rule">実在庫数と対象仕上げ台数は別々に入力します。仕上げ・撮影・リチェック＋登録の委託費は、対象台数 × 店舗別単価で計算します。</p>
+        <div className="inventory-coverage-strip">
+          <div><span>実在庫数</span><strong>{number.format(selectedProfile.inventoryUnits)}台</strong></div>
+          <div><span>対象仕上げ台数</span><strong>{number.format(selectedFinishingUnits)}台</strong></div>
+          <div><span>仕上げ対象率</span><strong>{percent.format(selectedCoverage)}</strong></div>
+          <div><span>対象外在庫</span><strong>{number.format(Math.max(0, selectedProfile.inventoryUnits - selectedFinishingUnits))}台</strong></div>
+        </div>
         <div className="service-assumptions">
-          <div className="service-assumption header"><span>業務</span><span>業務稼働率</span><span>予測台数</span><span>ガリバー請求</span><span>委託費</span></div>
+          <div className="service-assumption header"><span>業務</span><span>対象率</span><span>再予測台数</span><span>ガリバー請求</span><span>委託費</span></div>
           {selectedProfile.services.map((service) => <div className="service-assumption" key={service.key}>
             <label className="service-toggle"><input type="checkbox" checked={service.enabled} onChange={(event) => updateService(service.key, { enabled: event.target.checked })} /><span>{service.label}</span></label>
             <div className="utilization-control"><input type="range" min="0" max={service.billingBaseUnits ? "100" : "150"} step={service.billingUnitPrice != null || service.billingBaseUnits != null ? 100 / service.capacityUnits : 1} value={service.billingUnitPrice != null || service.billingBaseUnits != null ? service.utilization * 100 : Math.round(service.utilization * 100)} onChange={(event) => updateService(service.key, { utilization: Number(event.target.value) / 100 })} disabled={!service.enabled} /><strong>{percent.format(service.utilization)}</strong></div>
-            <span>{number.format(service.capacityUnits * service.utilization)}台</span>
+            <label className="service-units"><input type="number" min="0" step="1" value={Number((service.capacityUnits * service.utilization).toFixed(1))} onChange={(event) => updateService(service.key, { utilization: service.capacityUnits > 0 ? Math.max(0, Number(event.target.value)) / service.capacityUnits : 0 })} disabled={!service.enabled} aria-label={`${service.label}の再予測台数`} /><em>台</em></label>
             <strong>{yen.format(calculateServiceRevenue(service))}{service.billingPricingNote ? <small>{service.billingPricingNote}</small> : service.billingUnitPrice != null ? <small>{yen.format(service.billingUnitPrice)}／実台</small> : null}</strong>
             <strong>{yen.format(calculateServiceVariableCost(service))}{service.outsourcingPricingNote ? <small>{service.outsourcingPricingNote}</small> : service.outsourcingUnitPrice != null ? <small>{yen.format(service.outsourcingUnitPrice)}／実台</small> : null}</strong>
           </div>)}
@@ -495,9 +509,9 @@ function ActualsView({ financials }: { financials: StoreFinancials[] }) {
       </section>
     </div>
 
-    <section className="panel table-panel"><SectionTitle eyebrow="PLAN / ACTUAL / REFORECAST" title="当初計画・7月実績・修正予測の店舗別比較" /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>フェーズ</th><th>当初売上</th><th>7月売上</th><th>修正売上</th><th>当初粗利</th><th>7月粗利</th><th>修正粗利</th><th>修正粗利率</th></tr></thead><tbody>{profiles.map((profile) => { const plan = planByStore.get(profile.storeId); const actual = actualByStore.get(profile.storeId); const forecast = calculateOperatingForecast(profile); const actualGross = actual ? actual.revenue - actual.outsourcingCost : 0; return <tr key={profile.storeId}><td>{profile.storeName}</td><td>{phaseLabel(profile.phase)}</td><td>{yen.format(plan?.attaRevenue ?? 0)}</td><td>{yen.format(actual?.revenue ?? 0)}</td><td>{yen.format(forecast.revenue)}</td><td>{yen.format(plan?.attaGrossProfit ?? 0)}</td><td className={actualGross < 0 ? "negative-text" : ""}>{yen.format(actualGross)}</td><td className={forecast.grossProfit < 0 ? "negative-text" : ""}>{yen.format(forecast.grossProfit)}</td><td>{percent.format(forecast.grossMargin)}</td></tr>; })}</tbody></table></div><p className="panel-note">撮影は請求2,000円・委託1,500円／実台。リチェック＋登録は請求2,500円、委託は上荒磯2,500円・その他2,000円／実台です。未開設店舗は売上・原価とも0円です。</p></section>
+    <section className="panel table-panel"><SectionTitle eyebrow="ACTUAL / REFORECAST" title="7月・8月実績と再予測の店舗別比較" /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>実在庫</th><th>対象仕上げ</th><th>対象率</th><th>7月売上</th><th>8月売上</th><th>2か月平均</th><th>再予測売上</th><th>再予測原価</th><th>再予測粗利</th></tr></thead><tbody>{profiles.map((profile) => { const july = julyByStore.get(profile.storeId); const august = augustByStore.get(profile.storeId); const forecast = calculateOperatingForecast(profile); const finishing = profile.services.find((service) => service.key === "finishing"); const finishingUnits = finishing?.enabled ? finishing.capacityUnits * finishing.utilization : 0; const averageRevenue = ((july?.revenue ?? 0) + (august?.revenue ?? 0)) / 2; return <tr key={profile.storeId}><td>{profile.storeName}</td><td>{number.format(profile.inventoryUnits)}台</td><td>{number.format(finishingUnits)}台</td><td>{profile.inventoryUnits ? percent.format(finishingUnits / profile.inventoryUnits) : "—"}</td><td>{yen.format(july?.revenue ?? 0)}</td><td>{yen.format(august?.revenue ?? 0)}</td><td>{yen.format(averageRevenue)}</td><td>{yen.format(forecast.revenue)}</td><td>{yen.format(forecast.directCost)}</td><td className={forecast.grossProfit < 0 ? "negative-text" : ""}>{yen.format(forecast.grossProfit)}</td></tr>; })}</tbody></table></div><p className="panel-note">実在庫数と対象仕上げ台数は別管理です。撮影は請求2,000円・委託1,500円／実台、リチェック＋登録は請求2,500円、委託は上荒磯2,500円・その他2,000円／実台で再予測します。</p></section>
 
-    <section className="panel table-panel"><SectionTitle eyebrow="STORE ACTUAL" title="店舗別 7月売上・業務委託費" /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>売上（税抜）</th><th>業務委託費（税抜）</th><th>直接粗利</th><th>粗利率</th><th>確認状況</th></tr></thead><tbody>{july2026Actual.stores.map((store) => { const gross = store.revenue - store.outsourcingCost; return <tr key={store.id}><td>{store.name}</td><td>{yen.format(store.revenue)}</td><td>{yen.format(store.outsourcingCost)}</td><td className={gross < 0 ? "negative-text" : ""}>{yen.format(gross)}</td><td className={gross < 0 ? "negative-text" : ""}>{percent.format(store.revenue ? gross / store.revenue : 0)}</td><td>{store.costStatus === "unallocated" ? <span className="pending-badge">原価未配賦</span> : <span className="confirmed-badge">配賦済み</span>}</td></tr>; })}</tbody><tfoot><tr><td>合計</td><td>{yen.format(july2026Actual.revenue)}</td><td>{yen.format(july2026Actual.storeOutsourcingCost)}</td><td>{yen.format(july2026Summary.grossProfit)}</td><td>{percent.format(july2026Summary.grossMargin)}</td><td>—</td></tr></tfoot></table></div><p className="panel-note">所沢は売上伝票がありますが、今回共有された店舗別業務委託費に配賦がないため原価未配賦と表示しています。つくばは7月実績なしです。</p></section>
+    <section className="panel table-panel"><SectionTitle eyebrow="TWO-MONTH ACTUAL" title="店舗別 7月・8月実績" /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>7月売上</th><th>7月委託費</th><th>7月粗利</th><th>8月売上</th><th>8月委託費</th><th>8月粗利</th><th>2か月平均売上</th></tr></thead><tbody>{profiles.map((profile) => { const july = julyByStore.get(profile.storeId); const august = augustByStore.get(profile.storeId); const julyGross = (july?.revenue ?? 0) - (july?.outsourcingCost ?? 0); const augustGross = (august?.revenue ?? 0) - (august?.outsourcingCost ?? 0); return <tr key={profile.storeId}><td>{profile.storeName}</td><td>{yen.format(july?.revenue ?? 0)}</td><td>{yen.format(july?.outsourcingCost ?? 0)}</td><td className={julyGross < 0 ? "negative-text" : ""}>{yen.format(julyGross)}</td><td>{yen.format(august?.revenue ?? 0)}</td><td>{yen.format(august?.outsourcingCost ?? 0)}</td><td className={augustGross < 0 ? "negative-text" : ""}>{yen.format(augustGross)}</td><td>{yen.format(((july?.revenue ?? 0) + (august?.revenue ?? 0)) / 2)}</td></tr>; })}</tbody><tfoot><tr><td>対象6店舗</td><td>{yen.format(julyComparable.revenue)}</td><td>{yen.format(julyComparable.directCost)}</td><td>{yen.format(julyComparable.grossProfit)}</td><td>{yen.format(augustComparable.revenue)}</td><td>{yen.format(augustComparable.directCost)}</td><td>{yen.format(augustComparable.grossProfit)}</td><td>{yen.format(twoMonthAverage.revenue)}</td></tr></tfoot></table></div><p className="panel-note">所沢は再予測対象外です。8月は請求書未着・共通未配賦原価を含むため、確定後に更新できます。</p></section>
 
     <div className="two-column actual-detail-columns">
       <section className="panel"><SectionTitle eyebrow="STORE PROFIT" title="店舗別 売上と直接粗利" /><div className="legend"><span><i className="legend-blue" />売上</span><span><i className="legend-amber" />直接粗利</span></div><BarComparison rows={july2026Actual.stores.map((store) => ({ label: store.name, primary: store.revenue, secondary: store.revenue - store.outsourcingCost }))} /></section>

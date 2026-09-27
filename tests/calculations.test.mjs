@@ -190,14 +190,14 @@ test("再予測は撮影・リチェックを実台数と新単価で別計算�
       { key: "recheck", units: 100, billingUnitPrice: 2_500, outsourcingUnitPrice: 2_000 },
     ],
   );
-  assert.equal(omiya.services.find((service) => service.key === "recheck").capacityUnits * omiya.services.find((service) => service.key === "recheck").utilization, 51);
+  assert.equal(omiya.services.find((service) => service.key === "recheck").capacityUnits * omiya.services.find((service) => service.key === "recheck").utilization, 68);
   assert.equal(omiya.services.find((service) => service.key === "recheck").outsourcingUnitPrice, 2_500);
-  assert.equal(shinsayama.services.find((service) => service.key === "recheck").capacityUnits * shinsayama.services.find((service) => service.key === "recheck").utilization, 107);
+  assert.equal(shinsayama.services.find((service) => service.key === "recheck").capacityUnits * shinsayama.services.find((service) => service.key === "recheck").utilization, 113);
   assert.equal(shinsayama.services.find((service) => service.key === "recheck").outsourcingUnitPrice, 2_500);
   const result = summarizeOperatingForecast(initialOperatingProfiles);
-  assert.equal(result.revenue, 5_036_295);
-  assert.equal(result.directCost, 3_566_386);
-  assert.equal(result.grossProfit, 1_469_909);
+  assert.equal(result.revenue, 5_065_595);
+  assert.equal(result.directCost, 3_912_536);
+  assert.equal(result.grossProfit, 1_153_059);
 });
 
 test("大宮の仕上げは台数に応じて売上と委託費が増減する", () => {
@@ -205,7 +205,18 @@ test("大宮の仕上げは台数に応じて売上と委託費が増減する",
   const finishing = omiya.services.find((service) => service.key === "finishing");
   finishing.utilization = 1;
   assert.equal(calculateServiceRevenue(finishing), 1_144_000);
-  assert.equal(calculateServiceVariableCost(finishing), 585_000);
+  assert.equal(calculateServiceVariableCost(finishing), 643_500);
+});
+
+test("新狭山の仕上げ委託費は対象台数×5,500円で増減する", () => {
+  const shinsayama = structuredClone(initialOperatingProfiles.find((profile) => profile.storeId === "shinsayama"));
+  const finishing = shinsayama.services.find((service) => service.key === "finishing");
+  finishing.utilization = 100 / finishing.capacityUnits;
+  assert.equal(calculateServiceVariableCost(finishing), 550_000);
+  finishing.utilization = 99 / finishing.capacityUnits;
+  assert.equal(calculateServiceVariableCost(finishing), 544_500);
+  assert.equal(shinsayama.fixedCost, 0);
+  assert.equal(shinsayama.inventoryUnits, 200);
 });
 
 test("一宮の撮影は200台基準の減額方式で計算する", () => {
