@@ -48,7 +48,7 @@ const managementDescription = (store: Store) => store.managementPartner === "nas
 const navItems: Array<{ id: Tab; label: string; icon: string }> = [
   { id: "summary", label: "サマリー", icon: "◫" },
   { id: "actuals", label: "実績・再予測", icon: "●" },
-  { id: "stores", label: "店舗別", icon: "▦" },
+  { id: "stores", label: "店舗別比較", icon: "▦" },
   { id: "cashflow", label: "キャッシュフロー", icon: "↗" },
   { id: "simulator", label: "店舗追加", icon: "＋" },
   { id: "settings", label: "設定", icon: "⚙" },
@@ -503,7 +503,55 @@ function ActualsView({ financials }: { financials: StoreFinancials[] }) {
   </>;
 }
 
-function StoresView({ financials, selected, setSelected, settings }: { financials: StoreFinancials[]; selected: StoreFinancials; setSelected: (id: string) => void; settings: SimulationSettings }) {
+type StoresViewProps = { financials: StoreFinancials[]; selected: StoreFinancials; setSelected: (id: string) => void; settings: SimulationSettings };
+
+function StoresView(props: StoresViewProps) {
+  const [mode, setMode] = useState<"simulation" | "actual">("simulation");
+  const [periodId, setPeriodId] = useState(august2026Actual.id);
+  const actual = actualPeriods.find((period) => period.id === periodId) ?? august2026Actual;
+  return <>
+    <div className="store-view-controls">
+      <div><span className="eyebrow">STORE COMPARISON</span><h1>店舗別比較</h1><p>現行シミュレーションと月次実績を切り替えて確認できます。</p></div>
+      <div className="store-view-actions">
+        <div className="segmented"><button className={mode === "simulation" ? "active" : ""} onClick={() => setMode("simulation")}>シミュレーション</button><button className={mode === "actual" ? "active" : ""} onClick={() => setMode("actual")}>月次実績</button></div>
+        {mode === "actual" ? <div className="segmented">{actualPeriods.map((period) => <button key={period.id} className={actual.id === period.id ? "active" : ""} onClick={() => setPeriodId(period.id)}>{period.shortPeriod}</button>)}</div> : null}
+      </div>
+    </div>
+    {mode === "simulation" ? <SimulationStoresView {...props} /> : <ActualStoresView actual={actual} />}
+  </>;
+}
+
+function ActualStoresView({ actual }: { actual: (typeof actualPeriods)[number] }) {
+  const [selectedId, setSelectedId] = useState("hachioji");
+  const selected = actual.stores.find((store) => store.id === selectedId) ?? actual.stores[0];
+  const plan = actual.simulation.stores.find((store) => store.id === selected.id);
+  const grossProfit = selected.revenue - selected.outsourcingCost;
+  const grossMargin = selected.revenue ? grossProfit / selected.revenue : 0;
+  const attainment = plan?.revenue ? selected.revenue / plan.revenue : null;
+  const allocations = actual.allocations.filter((item) => item.store === selected.name);
+  const signedYen = (value: number) => `${value >= 0 ? "+" : "−"}${yen.format(Math.abs(value))}`;
+  return <>
+    <SectionTitle eyebrow="MONTHLY STORE ACTUAL" title={`${actual.period} 店舗別実績`} action={<span className={actual.status === "confirmed" ? "confirmed-badge" : "provisional-badge"}>{actual.status === "confirmed" ? "確定" : "暫定"}</span>} />
+    <div className="store-chips">{actual.stores.map((store) => <button key={store.id} className={selected.id === store.id ? "active" : ""} onClick={() => setSelectedId(store.id)}><span className="status-dot actual" />{store.name}<small>{store.costStatus === "unallocated" ? "原価未配賦" : store.costStatus === "provisional" ? "見込み含む" : "配賦済み"}</small></button>)}</div>
+    <section className="metric-grid primary-metrics">
+      <MetricCard label="実績売上" value={yen.format(selected.revenue)} helper={plan ? `計画 ${yen.format(plan.revenue)}` : "シミュレーション計画外"} />
+      <MetricCard label="売上達成率" value={attainment == null ? "—" : percent.format(attainment)} helper={plan ? `計画差 ${signedYen(selected.revenue - plan.revenue)}` : "比較対象なし"} tone={attainment != null && attainment >= 1 ? "green" : "amber"} />
+      <MetricCard label="業務委託費" value={yen.format(selected.outsourcingCost)} helper="店舗配賦済み原価" tone="amber" />
+      <MetricCard label="店舗粗利" value={yen.format(grossProfit)} helper={`粗利率 ${percent.format(grossMargin)}`} tone={grossProfit >= 0 ? "blue" : "amber"} />
+    </section>
+    <div className="detail-grid actual-store-detail">
+      <section className="panel">
+        <div className="store-header"><div><span className="category-label actual">月次実績</span><h1>{selected.name}</h1><p>{actual.period} ／ 比較基準 {actual.simulation.label}</p></div><div className="inventory"><strong>{attainment == null ? "—" : percent.format(attainment)}</strong><span>売上達成率</span></div></div>
+        <div className="detail-kpis"><div><span>計画売上</span><strong>{plan ? yen.format(plan.revenue) : "計画外"}</strong></div><div><span>実績売上</span><strong>{yen.format(selected.revenue)}</strong></div><div><span>計画差</span><strong>{plan ? signedYen(selected.revenue - plan.revenue) : "—"}</strong></div><div><span>店舗粗利</span><strong>{yen.format(grossProfit)}</strong></div><div><span>粗利率</span><strong>{percent.format(grossMargin)}</strong></div></div>
+        <div className="note-columns"><div><span>委託費内訳</span>{allocations.length ? allocations.map((item, index) => <p key={`${item.contractor}-${index}`}>• {item.contractor}：{yen.format(item.amount)}（{item.work}）</p>) : <p>• 店舗別の委託費内訳なし</p>}</div><div><span>集計上の注意</span>{actual.notes.map((note) => <p key={note}>• {note}</p>)}</div></div>
+      </section>
+      <section className="panel financial-stack"><h3>{actual.period} 実績</h3><div><span>売上</span><strong>{yen.format(selected.revenue)}</strong></div><div><span>業務委託費</span><strong>− {yen.format(selected.outsourcingCost)}</strong></div><div className="profit"><span>店舗粗利</span><strong>{yen.format(grossProfit)}</strong></div><div><span>粗利率</span><strong>{percent.format(grossMargin)}</strong></div>{plan ? <><h3>シミュレーション比較</h3><div><span>計画売上</span><strong>{yen.format(plan.revenue)}</strong></div><div><span>売上差</span><strong className={selected.revenue < plan.revenue ? "negative-text" : "positive-text"}>{signedYen(selected.revenue - plan.revenue)}</strong></div><div><span>達成率</span><strong>{percent.format(attainment ?? 0)}</strong></div></> : null}</section>
+    </div>
+    <section className="panel table-panel"><SectionTitle eyebrow="ALL STORE ACTUALS" title={`${actual.period} 店舗別実績一覧`} /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>計画売上</th><th>実績売上</th><th>達成率</th><th>業務委託費</th><th>店舗粗利</th><th>粗利率</th><th>状態</th></tr></thead><tbody>{actual.stores.map((store) => { const storePlan = actual.simulation.stores.find((item) => item.id === store.id); const gross = store.revenue - store.outsourcingCost; return <tr key={store.id}><td><button className="table-link" onClick={() => setSelectedId(store.id)}>{store.name}</button></td><td>{storePlan ? yen.format(storePlan.revenue) : "計画外"}</td><td>{yen.format(store.revenue)}</td><td>{storePlan?.revenue ? percent.format(store.revenue / storePlan.revenue) : "—"}</td><td>{yen.format(store.outsourcingCost)}</td><td className={gross < 0 ? "negative-text" : ""}>{yen.format(gross)}</td><td>{store.revenue ? percent.format(gross / store.revenue) : "—"}</td><td>{store.costStatus === "unallocated" ? "原価未配賦" : store.costStatus === "provisional" ? "見込み含む" : "配賦済み"}</td></tr>; })}</tbody></table></div><p className="panel-note">全社共通・未配賦原価は店舗粗利に含めず、月次実績の全社合計で控除しています。</p></section>
+  </>;
+}
+
+function SimulationStoresView({ financials, selected, setSelected, settings }: StoresViewProps) {
   const monthlyKitExpense = starterKitMonthlyExpense(settings.operatingCosts.attaStarterKitCostPerStore, settings.operatingCosts.starterKitAccountingMethod);
   return <>
     <SectionTitle eyebrow="STORE PORTFOLIO" title="店舗別収益と投資回収" />
