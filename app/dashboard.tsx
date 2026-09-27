@@ -10,7 +10,14 @@ import {
   summarizeCashFlow,
 } from "../lib/calculations";
 import { defaultExpansionInputs, operatingCostSettings, pricing, stores } from "../lib/data";
-import { july2026Actual, july2026Summary } from "../lib/actuals";
+import {
+  actualPeriods,
+  august2026Actual,
+  august2026Summary,
+  july2026Actual,
+  july2026Summary,
+  summarizeActual,
+} from "../lib/actuals";
 import {
   calculateOperatingForecast,
   initialOperatingProfiles,
@@ -261,11 +268,11 @@ export default function Dashboard() {
               </section>
 
               <section className="actual-summary-banner">
-                <div className="actual-summary-heading"><span>2026年7月 確定実績</span><strong>稼働率80%時点の粗利を確認</strong><button onClick={() => setTab("actuals")}>実績詳細を見る →</button></div>
-                <div><span>税抜売上</span><strong>{yen.format(july2026Actual.revenue)}</strong></div>
-                <div><span>直接粗利</span><strong>{yen.format(july2026Summary.grossProfit)}</strong></div>
-                <div><span>直接粗利率</span><strong>{percent.format(july2026Summary.grossMargin)}</strong></div>
-                <div><span>備品費控除後</span><strong>{yen.format(july2026Summary.contributionProfit)}</strong></div>
+                <div className="actual-summary-heading"><span>2026年8月 暫定実績</span><strong>シミュレーション比と前月差を確認</strong><button onClick={() => setTab("actuals")}>実績詳細を見る →</button></div>
+                <div><span>税抜売上</span><strong>{yen.format(august2026Actual.revenue)}</strong></div>
+                <div><span>売上達成率</span><strong>{percent.format(august2026Summary.revenueAttainment)}</strong></div>
+                <div><span>直接粗利</span><strong>{yen.format(august2026Summary.grossProfit)}</strong></div>
+                <div><span>粗利達成率</span><strong>{percent.format(august2026Summary.grossProfitAttainment)}</strong></div>
               </section>
 
               <SectionTitle eyebrow="NEW STORE ECONOMICS" title={`追加${inputs.storeCount}店舗の投資・回収見通し`} action={<button className="text-button" onClick={() => setTab("simulator")}>条件を変更 →</button>} />
@@ -326,6 +333,82 @@ export default function Dashboard() {
   );
 }
 
+function ActualHistoryView() {
+  const [selectedPeriodId, setSelectedPeriodId] = useState(august2026Actual.id);
+  const selectedIndex = actualPeriods.findIndex((period) => period.id === selectedPeriodId);
+  const actual = actualPeriods[selectedIndex] ?? august2026Actual;
+  const previous = selectedIndex > 0 ? actualPeriods[selectedIndex - 1] : null;
+  const summary = summarizeActual(actual);
+  const previousSummary = previous ? summarizeActual(previous) : null;
+  const actualByStore = new Map(actual.stores.map((store) => [store.id, store]));
+  const planByStore = new Map(actual.simulation.stores.map((store) => [store.id, store]));
+  const storeIds = Array.from(new Set([...actual.simulation.stores.map((store) => store.id), ...actual.stores.map((store) => store.id)]));
+  const signedYen = (value: number) => `${value >= 0 ? "+" : "−"}${yen.format(Math.abs(value))}`;
+  const statusLabel = (status?: "confirmed" | "provisional" | "unallocated") =>
+    status === "unallocated" ? "原価未配賦" : status === "provisional" ? "見込み含む" : "配賦済み";
+
+  return <>
+    <section className="actual-history-header">
+      <div>
+        <span className="eyebrow">MONTHLY ACTUALS</span>
+        <h1>月次実績とシミュレーション比較</h1>
+        <p>実績は月ごとに追加し、当時のシミュレーションを固定保存して達成率を比較します。</p>
+      </div>
+      <div className="period-switcher" aria-label="実績月を選択">
+        {actualPeriods.map((period) => <button key={period.id} className={actual.id === period.id ? "active" : ""} onClick={() => setSelectedPeriodId(period.id)}><strong>{period.shortPeriod}</strong><small>{period.status === "confirmed" ? "確定" : "暫定"}</small></button>)}
+      </div>
+    </section>
+
+    <section className="actual-context-bar">
+      <div><span>表示中</span><strong>{actual.period}</strong><i className={actual.status === "confirmed" ? "status-confirmed" : "status-provisional"}>{actual.status === "confirmed" ? "確定実績" : "暫定実績"}</i></div>
+      <div><span>比較シミュレーション</span><strong>{actual.simulation.label}</strong><small>{actual.simulation.version} ／ {actual.simulation.frozenAt}保存</small></div>
+      <p>シミュレーションを今後改定しても、この月の達成率は保存済みの比較基準で維持されます。</p>
+    </section>
+
+    <section className="metric-grid primary-metrics attainment-metrics">
+      <MetricCard label={`${actual.shortPeriod}売上`} value={yen.format(actual.revenue)} helper={previous ? `前月比 ${signedYen(actual.revenue - previous.revenue)}` : "月次実績"} />
+      <MetricCard label="売上達成率" value={percent.format(summary.revenueAttainment)} helper={`計画差 ${signedYen(summary.revenueVariance)}`} tone={summary.revenueAttainment >= 1 ? "green" : "amber"} formula="実績売上 ÷ 保存済みシミュレーション売上" />
+      <MetricCard label="直接粗利" value={yen.format(summary.grossProfit)} helper={`粗利率 ${percent.format(summary.grossMargin)}`} tone="blue" />
+      <MetricCard label="粗利達成率" value={percent.format(summary.grossProfitAttainment)} helper={`計画差 ${signedYen(summary.grossProfitVariance)}`} tone={summary.grossProfitAttainment >= 1 ? "green" : "amber"} formula="実績直接粗利 ÷ 保存済みシミュレーション直接粗利" />
+    </section>
+
+    <section className="attainment-panel panel">
+      <SectionTitle eyebrow="PLAN / ACTUAL" title={`${actual.period} 達成率`} />
+      <div className="attainment-row"><span>売上</span><div><i style={{ width: `${Math.min(100, summary.revenueAttainment * 100)}%` }} /></div><strong>{percent.format(summary.revenueAttainment)}</strong><small>{yen.format(actual.revenue)} / {yen.format(summary.planRevenue)}</small></div>
+      <div className="attainment-row"><span>直接粗利</span><div><i className="profit" style={{ width: `${Math.min(100, Math.max(0, summary.grossProfitAttainment * 100))}%` }} /></div><strong>{percent.format(summary.grossProfitAttainment)}</strong><small>{yen.format(summary.grossProfit)} / {yen.format(summary.planGrossProfit)}</small></div>
+    </section>
+
+    <div className="two-column monthly-comparison-grid">
+      <section className="panel table-panel monthly-table">
+        <SectionTitle eyebrow="MONTHLY TREND" title="月別推移" />
+        <div className="table-scroll"><table><thead><tr><th>月</th><th>状態</th><th>売上</th><th>前月差</th><th>売上達成率</th><th>直接粗利</th><th>粗利率</th><th>粗利達成率</th></tr></thead><tbody>{actualPeriods.map((period, index) => { const item = summarizeActual(period); const prior = index > 0 ? actualPeriods[index - 1] : null; return <tr key={period.id} className={period.id === actual.id ? "selected-row" : ""}><td><button className="table-link" onClick={() => setSelectedPeriodId(period.id)}>{period.shortPeriod}</button></td><td>{period.status === "confirmed" ? <span className="confirmed-badge">確定</span> : <span className="provisional-badge">暫定</span>}</td><td>{yen.format(period.revenue)}</td><td className={prior && period.revenue < prior.revenue ? "negative-text" : "positive-text"}>{prior ? signedYen(period.revenue - prior.revenue) : "—"}</td><td>{percent.format(item.revenueAttainment)}</td><td>{yen.format(item.grossProfit)}</td><td>{percent.format(item.grossMargin)}</td><td>{percent.format(item.grossProfitAttainment)}</td></tr>; })}</tbody></table></div>
+      </section>
+      <section className="panel variance-summary">
+        <SectionTitle eyebrow="VARIANCE" title="差異の要点" />
+        <div><span>売上計画差</span><strong className={summary.revenueVariance < 0 ? "negative-text" : "positive-text"}>{signedYen(summary.revenueVariance)}</strong></div>
+        <div><span>直接粗利計画差</span><strong className={summary.grossProfitVariance < 0 ? "negative-text" : "positive-text"}>{signedYen(summary.grossProfitVariance)}</strong></div>
+        <div><span>前月売上差</span><strong>{previous ? signedYen(actual.revenue - previous.revenue) : "—"}</strong></div>
+        <div><span>前月粗利差</span><strong>{previousSummary ? signedYen(summary.grossProfit - previousSummary.grossProfit) : "—"}</strong></div>
+        <div><span>備品費控除後</span><strong>{yen.format(summary.contributionProfit)}</strong></div>
+        <div><span>共通・未配賦原価</span><strong>{yen.format(actual.commonUnallocatedCost)}</strong></div>
+      </section>
+    </div>
+
+    <section className="panel table-panel">
+      <SectionTitle eyebrow="STORE ATTAINMENT" title={`${actual.period} 店舗別の計画・実績・達成率`} />
+      <div className="table-scroll"><table><thead><tr><th>店舗</th><th>計画売上</th><th>実績売上</th><th>売上差</th><th>売上達成率</th><th>実績原価</th><th>店舗粗利</th><th>粗利率</th><th>確認状況</th></tr></thead><tbody>{storeIds.map((id) => { const plan = planByStore.get(id); const store = actualByStore.get(id); const revenue = store?.revenue ?? 0; const cost = store?.outsourcingCost ?? 0; const gross = revenue - cost; const attainment = plan?.revenue ? revenue / plan.revenue : null; return <tr key={id}><td>{store?.name ?? plan?.name ?? id}</td><td>{plan ? yen.format(plan.revenue) : "計画外"}</td><td>{yen.format(revenue)}</td><td className={plan && revenue < plan.revenue ? "negative-text" : "positive-text"}>{plan ? signedYen(revenue - plan.revenue) : "—"}</td><td>{attainment == null ? "—" : percent.format(attainment)}</td><td>{yen.format(cost)}</td><td className={gross < 0 ? "negative-text" : ""}>{yen.format(gross)}</td><td>{revenue ? percent.format(gross / revenue) : "—"}</td><td>{store ? <span className={store.costStatus === "unallocated" ? "pending-badge" : store.costStatus === "provisional" ? "provisional-badge" : "confirmed-badge"}>{statusLabel(store.costStatus)}</span> : "実績なし"}</td></tr>; })}</tbody><tfoot><tr><td>全社合計</td><td>{yen.format(summary.planRevenue)}</td><td>{yen.format(actual.revenue)}</td><td className={summary.revenueVariance < 0 ? "negative-text" : "positive-text"}>{signedYen(summary.revenueVariance)}</td><td>{percent.format(summary.revenueAttainment)}</td><td>{yen.format(actual.storeOutsourcingCost)}</td><td>{yen.format(summary.grossProfit)}</td><td>{percent.format(summary.grossMargin)}</td><td>{actual.status === "confirmed" ? "確定" : "暫定"}</td></tr></tfoot></table></div>
+      <p className="panel-note">店舗粗利は店舗に配賦済みの原価で計算しています。全社合計には共通・未配賦原価 {yen.format(actual.commonUnallocatedCost)} を含みます。</p>
+    </section>
+
+    <div className="two-column actual-detail-columns">
+      <section className="panel"><SectionTitle eyebrow="STORE REVENUE" title="店舗別 計画売上と実績売上" /><div className="legend"><span><i className="legend-blue" />計画</span><span><i className="legend-green" />実績</span></div><BarComparison rows={actual.simulation.stores.map((plan) => ({ label: plan.name, primary: plan.revenue, secondary: actualByStore.get(plan.id)?.revenue ?? 0, secondaryAccent: "green" }))} /></section>
+      <section className="panel"><SectionTitle eyebrow="COST ALLOCATION" title="委託先・店舗別内訳" /><div className="allocation-list">{actual.allocations.map((item, index) => <div key={`${item.store}-${item.contractor}-${index}`}><span><strong>{item.store}</strong>{item.contractor}<small>{item.work}{item.status === "provisional" ? "／見込み" : ""}</small></span><b>{yen.format(item.amount)}</b></div>)}</div></section>
+    </div>
+
+    <section className="actual-note"><strong>集計メモ</strong><span>{actual.notes.join(" ")}</span></section>
+  </>;
+}
+
 function ActualsView({ financials }: { financials: StoreFinancials[] }) {
   const [profiles, setProfiles] = useState<StoreOperatingProfile[]>(() => structuredClone(initialOperatingProfiles));
   const [selectedProfileId, setSelectedProfileId] = useState(initialOperatingProfiles[0].storeId);
@@ -351,19 +434,21 @@ function ActualsView({ financials }: { financials: StoreFinancials[] }) {
   const planByStore = new Map(financials.map((item) => [item.store.id, item]));
 
   return <>
-    <section className="actual-hero">
+    <ActualHistoryView />
+    <div className="reforecast-divider"><span>次回シミュレーション見直し</span><strong>実績を基に将来条件を更新</strong></div>
+    <section className="actual-hero legacy-actual">
       <div><span className="eyebrow">JULY 2026 ACTUAL</span><h1>7月実績</h1><p>請求データと業務委託費の店舗配賦を税抜で集計。予測モデルとは分離して表示しています。</p></div>
       <div className="utilization-ring"><strong>{percent.format(july2026Actual.utilizationRate)}</strong><span>推定稼働率</span></div>
     </section>
 
-    <section className="metric-grid primary-metrics">
+    <section className="metric-grid primary-metrics legacy-actual">
       <MetricCard label="7月売上" value={yen.format(july2026Actual.revenue)} helper={`100%稼働換算 ${yen.format(july2026Summary.fullCapacityRevenue)}`} formula="伝票・撮影／リチェック・水洗い請求の税抜売上合計" />
       <MetricCard label="店舗別業務委託費" value={yen.format(july2026Actual.storeOutsourcingCost)} helper="上荒磯リチェック268,000円を含む" tone="amber" />
       <MetricCard label="直接粗利" value={yen.format(july2026Summary.grossProfit)} helper={`粗利率 ${percent.format(july2026Summary.grossMargin)}`} tone="blue" formula="売上 − 店舗別業務委託費" />
       <MetricCard label="備品費控除後利益" value={yen.format(july2026Summary.contributionProfit)} helper={`利益率 ${percent.format(july2026Summary.contributionProfit / july2026Actual.revenue)}`} tone="green" formula="直接粗利 − 高橋共通費 − 東日本ライティング備品費（税抜換算）" />
     </section>
 
-    <section className="actual-cost-strip">
+    <section className="actual-cost-strip legacy-actual">
       <div><span>高橋 備品・共通費</span><strong>{yen.format(july2026Actual.commonEquipmentCost)}</strong><small>税抜</small></div>
       <div><span>東日本ライティング</span><strong>{yen.format(july2026Actual.lightingEquipmentCostTaxIncluded)}</strong><small>税込／税抜換算 {yen.format(july2026Actual.lightingEquipmentCostTaxExclusive)}</small></div>
       <div><span>備品費合計</span><strong>{yen.format(july2026Summary.equipmentCost)}</strong><small>粗利後に控除・税抜換算</small></div>

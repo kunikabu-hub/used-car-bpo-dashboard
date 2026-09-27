@@ -10,7 +10,7 @@ import {
   summarizeCashFlow,
 } from "../lib/calculations.ts";
 import { defaultExpansionInputs, operatingCostSettings, pricing, stores } from "../lib/data.ts";
-import { july2026Actual, july2026Summary } from "../lib/actuals.ts";
+import { august2026Actual, august2026Summary, july2026Actual, july2026Summary } from "../lib/actuals.ts";
 import {
   calculateOperatingForecast,
   initialOperatingProfiles,
@@ -149,6 +149,20 @@ test("2026年7月実績の売上・委託費・粗利率を集計する", () => 
   assert.ok(Math.abs(july2026Summary.grossMargin - 0.36728452948161305) < 1e-12);
   assert.equal(july2026Summary.equipmentCost, 176_301);
   assert.equal(july2026Summary.contributionProfit, 1_627_300);
+});
+
+test("2026年8月実績と保存済みシミュレーションの達成率を集計する", () => {
+  assert.equal(august2026Actual.stores.reduce((sum, store) => sum + store.revenue, 0), 6_573_916);
+  assert.equal(
+    august2026Actual.stores.reduce((sum, store) => sum + store.outsourcingCost, 0)
+      + august2026Actual.commonUnallocatedCost,
+    3_506_506,
+  );
+  assert.equal(august2026Actual.allocations.reduce((sum, item) => sum + item.amount, 0), 3_506_506);
+  assert.equal(august2026Summary.grossProfit, 3_067_410);
+  assert.equal(august2026Summary.contributionProfit, 3_024_210);
+  assert.ok(Math.abs(august2026Summary.revenueAttainment - 6_573_916 / 12_117_827) < 1e-12);
+  assert.ok(Math.abs(august2026Summary.grossProfitAttainment - 3_067_410 / 5_542_831) < 1e-12);
 });
 
 test("業務別稼働率モデルの初期値は比較対象店舗の7月実績と一致する", () => {
