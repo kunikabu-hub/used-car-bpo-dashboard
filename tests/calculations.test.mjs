@@ -92,10 +92,11 @@ test("つくばは展示150台のNaS管理、当面は撮影なし", () => {
   assert.equal(tsukuba?.finishingCount, 150);
   assert.equal(tsukuba?.photoCount, 0);
   assert.equal(tsukuba?.starterKitInstalled, false);
-  assert.equal(result.nasRevenue, 940_000);
+  assert.equal(tsukuba?.directFinishingCostPerUnit, 4_950);
+  assert.equal(result.nasRevenue, 1_007_500);
   assert.equal(result.nasStaffCost, 610_000);
   assert.equal(result.nasSupplyCost, 30000);
-  assert.equal(result.nasContributionProfit, 300000);
+  assert.equal(result.nasContributionProfit, 367500);
 });
 
 test("大宮は展示車両水洗いを収益・原価に含めない", () => {
@@ -106,10 +107,21 @@ test("大宮は展示車両水洗いを収益・原価に含めない", () => {
   assert.equal(result.washRevenue, 0);
   assert.equal(
     result.nasRevenue,
-      omiya.normalFinishingCount * pricing.attaToNas.normalFinishing +
+      omiya.normalFinishingCount * omiya.directFinishingCostPerUnit +
       omiya.photoCount * pricing.attaToNas.photo +
       omiya.recheckCount * omiya.directRecheckCostPerUnit,
   );
+});
+
+test("通常仕上げのパートナー委託単価を店舗別に設定する", () => {
+  assert.deepEqual(
+    Object.fromEntries(stores.filter((store) => ["soka", "omiya", "tsukuba", "shinsayama"].includes(store.id)).map((store) => [store.id, store.directFinishingCostPerUnit])),
+    { shinsayama: 5_500, omiya: 4_950, soka: 4_400, tsukuba: 4_950 },
+  );
+  const soka = calculateStoreSimulation(stores.find((store) => store.id === "soka"), settings);
+  assert.equal(soka.attaDirectCost, 1_700_000);
+  const omiya = calculateStoreSimulation(stores.find((store) => store.id === "omiya"), settings);
+  assert.equal(omiya.attaDirectCost, 1_163_500);
 });
 
 test("撮影・リチェックは新しい請求単価と委託単価を使う", () => {

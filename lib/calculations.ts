@@ -54,10 +54,11 @@ export function calculatePhotoContractRevenue(store: Store, settings: Simulation
 export function calculateNasRevenue(store: Store, pricing: Pricing) {
   if (!store.managedByNas) return 0;
   const { simple, normal, dirty } = mixCounts(store);
+  const finishingUnitPrice = store.directFinishingCostPerUnit;
   return (
-    simple * pricing.attaToNas.simpleFinishing +
-    normal * pricing.attaToNas.normalFinishing +
-    dirty * pricing.attaToNas.dirtyFinishing +
+    simple * (finishingUnitPrice ?? pricing.attaToNas.simpleFinishing) +
+    normal * (finishingUnitPrice ?? pricing.attaToNas.normalFinishing) +
+    dirty * (finishingUnitPrice ?? pricing.attaToNas.dirtyFinishing) +
     store.washCount * pricing.attaToNas.wash +
     store.photoCount * (store.directPhotoCostPerUnit ?? pricing.attaToNas.photo) +
     store.recheckCount * (store.directRecheckCostPerUnit ?? pricing.attaToNas.recheck)
