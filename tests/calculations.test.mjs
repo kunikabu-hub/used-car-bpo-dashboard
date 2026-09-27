@@ -233,16 +233,28 @@ test("一宮の撮影は200台基準の減額方式で計算する", () => {
   assert.equal(calculateServiceVariableCost(photo), 226_250);
 });
 
-test("未開設店舗は稼働率を設定しても売上・原価を計上しない", () => {
+test("未開設店舗も入力台数を再予測へ反映する", () => {
   const tsukuba = structuredClone(initialOperatingProfiles.find((profile) => profile.storeId === "tsukuba"));
-  tsukuba.services.forEach((service) => { service.utilization = 1; });
+  tsukuba.services.forEach((service) => { service.utilization = 0; });
+  tsukuba.services.find((service) => service.key === "finishing").utilization = 98 / 150;
+  const recheck = tsukuba.services.find((service) => service.key === "recheck");
+  recheck.enabled = true;
+  recheck.utilization = 40 / 70;
   assert.deepEqual(calculateOperatingForecast(tsukuba), {
-    revenue: 0,
-    variableCost: 0,
-    directCost: 0,
-    grossProfit: 0,
-    grossMargin: 0,
+    revenue: 962400,
+    variableCost: 585100,
+    directCost: 585100,
+    grossProfit: 377300,
+    grossMargin: 377300 / 962400,
   });
+});
+
+test("単価変更は保持済みの基準金額より優先して反映する", () => {
+  const service = structuredClone(initialOperatingProfiles.find((profile) => profile.storeId === "soka").services.find((service) => service.key === "finishing"));
+  service.outsourcingUnitPrice = 5000;
+  service.billingUnitPrice = 6000;
+  assert.equal(calculateServiceVariableCost(service), 155 * 5000);
+  assert.equal(calculateServiceRevenue(service), 155 * 6000);
 });
 
 test("最低保証は変動費を下回る場合だけ原価へ反映する", () => {

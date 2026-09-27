@@ -188,7 +188,7 @@ export const initialOperatingProfiles: StoreOperatingProfile[] = [
       unitPricedService("photo", "撮影", 150, 0, 2_000, 1_500),
       unitPricedService("recheck", "リチェック＋登録", 70, 0, 2_500, 2_500),
     ],
-    note: "開設前。開設月が確定するまで売上・原価とも0円。撮影なし。",
+    note: "初期台数は0台。未開設でも入力した業務台数を再予測に反映します。撮影なし。",
   },
 ];
 
@@ -204,9 +204,6 @@ export function calculateOperatingForecast(profile: StoreOperatingProfile) {
       grossProfit,
       grossMargin: revenue > 0 ? grossProfit / revenue : 0,
     };
-  }
-  if (profile.phase === "unopened") {
-    return { revenue: 0, variableCost: 0, directCost: 0, grossProfit: 0, grossMargin: 0 };
   }
   const activeServices = profile.services.filter((service) => service.enabled);
   const revenue = activeServices.reduce(
@@ -234,19 +231,21 @@ function decrementAmount(units: number, baseUnits: number, baseAmount: number, d
 
 export function calculateServiceRevenue(service: ServiceOperatingAssumption) {
   if (!service.enabled) return 0;
-  const units = service.capacityUnits * Math.max(0, service.utilization);
+  const units = Math.round(service.capacityUnits * Math.max(0, service.utilization) * 1e9) / 1e9;
   if (service.billingBaseUnits != null && service.billingBaseAmount != null && service.billingDecreasePerUnit != null) {
     return decrementAmount(units, service.billingBaseUnits, service.billingBaseAmount, service.billingDecreasePerUnit);
   }
+  if (service.billingUnitPrice != null) return units * service.billingUnitPrice;
   return service.capacityRevenue * Math.max(0, service.utilization);
 }
 
 export function calculateServiceVariableCost(service: ServiceOperatingAssumption) {
   if (!service.enabled) return 0;
-  const units = service.capacityUnits * Math.max(0, service.utilization);
+  const units = Math.round(service.capacityUnits * Math.max(0, service.utilization) * 1e9) / 1e9;
   if (service.outsourcingBaseUnits != null && service.outsourcingBaseAmount != null && service.outsourcingDecreasePerUnit != null) {
     return decrementAmount(units, service.outsourcingBaseUnits, service.outsourcingBaseAmount, service.outsourcingDecreasePerUnit);
   }
+  if (service.outsourcingUnitPrice != null) return units * service.outsourcingUnitPrice;
   return service.capacityVariableCost * Math.max(0, service.utilization);
 }
 

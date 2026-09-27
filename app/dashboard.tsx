@@ -226,14 +226,27 @@ export default function Dashboard() {
   }, 0);
   const updateInputs = <K extends keyof ExpansionInputs>(key: K, value: ExpansionInputs[K]) => setInputs((current) => ({ ...current, [key]: value }));
   const updateOperating = <K extends keyof SimulationSettings["operatingCosts"]>(key: K, value: SimulationSettings["operatingCosts"][K]) => setSettings((current) => ({ ...current, operatingCosts: { ...current.operatingCosts, [key]: value } }));
-  const updatePrice = (group: keyof Pricing, key: string, value: number) => setSettings((current) => ({
+  const updatePrice = (group: keyof Pricing, key: string, value: number) => {
+    if ((group === "client" || group === "attaToNas") && (key === "photo" || key === "recheck")) {
+      setOperatingProfiles((current) => current.map((profile) => ({ ...profile, services: profile.services.map((service) => {
+        if (service.key !== key || service.billingBaseUnits != null) return service;
+        if (group === "client") return { ...service, billingUnitPrice: value };
+        if (key === "recheck" && ["omiya", "shinsayama", "tsukuba"].includes(profile.storeId)) return service;
+        return { ...service, outsourcingUnitPrice: value };
+      }) })));
+    }
+    setSettings((current) => ({
     ...current,
     pricing: {
       ...current.pricing,
       [group]: { ...current.pricing[group], [key]: value },
     },
-  }));
-  const updateStoreFinishingCost = (storeId: string, value: number) => setStoreModels((current) => current.map((store) => store.id === storeId ? { ...store, directFinishingCostPerUnit: value } : store));
+    }));
+  };
+  const updateStoreFinishingCost = (storeId: string, value: number) => {
+    setStoreModels((current) => current.map((store) => store.id === storeId ? { ...store, directFinishingCostPerUnit: value } : store));
+    setOperatingProfiles((current) => current.map((profile) => profile.storeId === storeId ? { ...profile, services: profile.services.map((service) => service.key === "finishing" ? { ...service, outsourcingUnitPrice: value } : service) } : profile));
+  };
 
   const selectedFinancial = financials.find((item) => item.store.id === selectedStore) ?? financials[0];
   const currentNasStores = stores.filter((store) => store.managedByNas).length;
@@ -335,7 +348,7 @@ export default function Dashboard() {
           ) : null}
 
           {tab === "actuals" ? <ActualsView profiles={operatingProfiles} setProfiles={setOperatingProfiles} /> : null}
-          {tab === "stores" ? <StoresView financials={financials} selected={selectedFinancial} setSelected={setSelectedStore} settings={settings} /> : null}
+          {tab === "stores" ? <StoresView financials={financials} selected={selectedFinancial} setSelected={setSelectedStore} settings={settings} profiles={operatingProfiles} editForecast={() => setTab("actuals")} /> : null}
           {tab === "cashflow" ? <CashFlowView months={cashMonths} setMonths={setCashMonths} mode={deploymentMode} setMode={setDeploymentMode} flow={cashFlow} simultaneous={simultaneous} phased={phased} simSummary={simSummary} phasedSummary={phasedSummary} investment={expansion.starterKitInvestment} /> : null}
           {tab === "simulator" ? <SimulatorView inputs={inputs} updateInputs={updateInputs} expansion={expansion} settings={settings} setSettings={setSettings} paybackMonthsOverride={paybackMonthsOverride} setPaybackMonthsOverride={setPaybackMonthsOverride} /> : null}
           {tab === "settings" ? <SettingsView settings={settings} setSettings={setSettings} updateOperating={updateOperating} updatePrice={updatePrice} storeModels={storeModels} updateStoreFinishingCost={updateStoreFinishingCost} /> : null}
@@ -458,8 +471,8 @@ function ActualsView({ profiles, setProfiles }: { profiles: StoreOperatingProfil
     const automatic = calculateOperatingForecast({ ...selectedProfile, useDirectFinancials: false });
     updateProfile({
       useDirectFinancials: true,
-      directRevenue: automatic.revenue,
-      directCost: automatic.directCost,
+      directRevenue: selectedProfile.directRevenue ?? automatic.revenue,
+      directCost: selectedProfile.directCost ?? automatic.directCost,
     });
   };
 
@@ -508,6 +521,7 @@ function ActualsView({ profiles, setProfiles }: { profiles: StoreOperatingProfil
           <NumberInput label="最低保証" value={selectedProfile.minimumGuarantee} onChange={(value) => updateProfile({ minimumGuarantee: value })} suffix="円/月" step={1_000} />
         </div>
         <p className="editor-note">{selectedProfile.note}</p>
+        {selectedProfile.phase === "unopened" ? <p className="editor-note">未開設は店舗の状態を表します。入力した台数・売上・原価は再予測に含まれます。</p> : null}
         <p className="editor-note pricing-rule">実在庫数と対象仕上げ台数は別々に入力します。仕上げ・撮影・リチェック＋登録の委託費は、対象台数 × 店舗別単価で計算します。</p>
         <div className="inventory-coverage-strip">
           <div><span>実在庫数</span><strong>{number.format(selectedProfile.inventoryUnits)}台</strong></div>
@@ -553,21 +567,21 @@ function ActualsView({ profiles, setProfiles }: { profiles: StoreOperatingProfil
   </>;
 }
 
-type StoresViewProps = { financials: StoreFinancials[]; selected: StoreFinancials; setSelected: (id: string) => void; settings: SimulationSettings };
+type StoresViewProps = { financials: StoreFinancials[]; selected: StoreFinancials; setSelected: (id: string) => void; settings: SimulationSettings; profiles: StoreOperatingProfile[]; editForecast: () => void };
 
 function StoresView(props: StoresViewProps) {
-  const [mode, setMode] = useState<"simulation" | "actual">("simulation");
+  const [mode, setMode] = useState<"reforecast" | "simulation" | "actual">("reforecast");
   const [periodId, setPeriodId] = useState(august2026Actual.id);
   const actual = actualPeriods.find((period) => period.id === periodId) ?? august2026Actual;
   return <>
     <div className="store-view-controls">
-      <div><span className="eyebrow">STORE COMPARISON</span><h1>店舗別比較</h1><p>現行シミュレーションと月次実績を切り替えて確認できます。</p></div>
+      <div><span className="eyebrow">STORE COMPARISON</span><h1>店舗別比較</h1><p>現在の再予測・契約モデル・月次実績を切り替えて確認できます。</p></div>
       <div className="store-view-actions">
-        <div className="segmented"><button className={mode === "simulation" ? "active" : ""} onClick={() => setMode("simulation")}>シミュレーション</button><button className={mode === "actual" ? "active" : ""} onClick={() => setMode("actual")}>月次実績</button></div>
+        <div className="segmented"><button className={mode === "reforecast" ? "active" : ""} onClick={() => setMode("reforecast")}>現在の再予測</button><button className={mode === "simulation" ? "active" : ""} onClick={() => setMode("simulation")}>契約モデル</button><button className={mode === "actual" ? "active" : ""} onClick={() => setMode("actual")}>月次実績</button></div>
         {mode === "actual" ? <div className="segmented">{actualPeriods.map((period) => <button key={period.id} className={actual.id === period.id ? "active" : ""} onClick={() => setPeriodId(period.id)}>{period.shortPeriod}</button>)}</div> : null}
       </div>
     </div>
-    {mode === "simulation" ? <SimulationStoresView {...props} /> : <ActualStoresView actual={actual} />}
+    {mode === "reforecast" ? <section className="panel table-panel"><SectionTitle title="店舗別 現在の再予測" action={<button className="text-button" onClick={props.editForecast}>再予測を編集 →</button>} /><div className="table-scroll"><table><thead><tr><th>店舗</th><th>計算方法</th><th>売上</th><th>直接原価</th><th>直接粗利</th><th>粗利率</th><th>投資回収期間</th></tr></thead><tbody>{props.profiles.map((profile) => { const result = calculateOperatingForecast(profile); return <tr key={profile.storeId}><td>{profile.storeName}</td><td>{profile.useDirectFinancials ? "直接入力" : "業務別台数"}</td><td>{yen.format(result.revenue)}</td><td>{yen.format(result.directCost)}</td><td className={result.grossProfit < 0 ? "negative-text" : ""}>{yen.format(result.grossProfit)}</td><td>{percent.format(result.grossMargin)}</td><td>{result.grossProfit > 0 ? `${number.format(props.settings.operatingCosts.attaStarterKitCostPerStore / result.grossProfit)}か月` : "回収見込なし"}</td></tr>; })}</tbody></table></div><p className="panel-note">サマリー・実績再予測と同じ入力値を表示します。投資回収期間は1店舗のスターターキット費用 ÷ 月間直接粗利です。</p></section> : mode === "simulation" ? <SimulationStoresView {...props} /> : <ActualStoresView actual={actual} />}
   </>;
 }
 
