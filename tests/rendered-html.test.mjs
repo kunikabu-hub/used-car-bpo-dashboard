@@ -20,6 +20,8 @@ test("管理ダッシュボードをサーバー描画する", async () => {
   assert.match(html, /NaS用具費控除後利益/);
   assert.match(html, /2026年8月 暫定実績/);
   assert.match(html, /売上達成率/);
+  assert.match(html, /実台数×2,500円/);
+  assert.doesNotMatch(html, /リチェック換算率/);
   assert.match(html, /直接粗利率/);
   assert.match(html, /実績・再予測/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);

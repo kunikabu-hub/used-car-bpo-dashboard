@@ -13,24 +13,10 @@ const safeDivide = (numerator: number, denominator: number) =>
 
 export function calculateRecheckRevenue(
   actualUnits: number,
-  slots: number,
-  conversionRate: number,
   pricing: Pricing["client"],
   taxMultiplier = 1,
 ) {
-  if (slots <= 0 || actualUnits <= 0) return 0;
-  const convertedUnitsPerSlot = (actualUnits * conversionRate) / slots;
-  let perSlot = pricing.recheckBaseMonthlyFee;
-  if (convertedUnitsPerSlot < pricing.recheckLowerUnits) {
-    perSlot -=
-      (pricing.recheckLowerUnits - convertedUnitsPerSlot) *
-      pricing.recheckAdjustmentUnitPrice;
-  } else if (convertedUnitsPerSlot > pricing.recheckUpperUnits) {
-    perSlot +=
-      (convertedUnitsPerSlot - pricing.recheckUpperUnits) *
-      pricing.recheckAdjustmentUnitPrice;
-  }
-  return Math.max(0, perSlot * slots * taxMultiplier);
+  return Math.max(0, actualUnits) * pricing.recheck * taxMultiplier;
 }
 
 function mixCounts(store: Store) {
@@ -43,20 +29,15 @@ function mixCounts(store: Store) {
 export function calculateAttaRevenue(store: Store, settings: SimulationSettings) {
   if (store.actualMonthlyRevenue != null) return store.actualMonthlyRevenue;
   const { simple, normal, dirty } = mixCounts(store);
-  const photoBundledNormal = store.billPhotoAsFinishingBundle === false ? 0 : Math.min(normal, store.photoCount);
-  const normalWithoutPhoto = Math.max(0, normal - photoBundledNormal);
   const normalFinishingPrice = store.clientNormalFinishingPrice ?? settings.pricing.client.normalFinishing;
   const finishingRevenue =
     simple * settings.pricing.client.simpleFinishing +
-    normalWithoutPhoto * normalFinishingPrice +
-    photoBundledNormal * settings.pricing.client.normalFinishingWithPhoto +
+    normal * normalFinishingPrice +
     dirty * settings.pricing.client.dirtyFinishing;
   const washRevenue = store.washCount * settings.pricing.client.wash;
   const taxMultiplier = settings.taxMode === "taxIncluded" ? 1 + settings.taxRate : 1;
   const recheckRevenue = calculateRecheckRevenue(
     store.recheckCount,
-    store.recheckSlots,
-    settings.recheckConversionRate,
     settings.pricing.client,
     taxMultiplier,
   );
@@ -65,18 +46,9 @@ export function calculateAttaRevenue(store: Store, settings: SimulationSettings)
 }
 
 export function calculatePhotoContractRevenue(store: Store, settings: SimulationSettings) {
-  if (!store.photoContractConversionRate || store.photoCount <= 0) return 0;
-  return calculateRecheckRevenue(
-    store.photoCount,
-    1,
-    store.photoContractConversionRate,
-    {
-      ...settings.pricing.client,
-      recheckAdjustmentUnitPrice:
-        store.photoContractAdjustmentUnitPrice ?? settings.pricing.client.recheckAdjustmentUnitPrice,
-    },
-    settings.taxMode === "taxIncluded" ? 1 + settings.taxRate : 1,
-  );
+  if (store.photoCount <= 0) return 0;
+  const taxMultiplier = settings.taxMode === "taxIncluded" ? 1 + settings.taxRate : 1;
+  return store.photoCount * settings.pricing.client.photo * taxMultiplier;
 }
 
 export function calculateNasRevenue(store: Store, pricing: Pricing) {
@@ -87,8 +59,8 @@ export function calculateNasRevenue(store: Store, pricing: Pricing) {
     normal * pricing.attaToNas.normalFinishing +
     dirty * pricing.attaToNas.dirtyFinishing +
     store.washCount * pricing.attaToNas.wash +
-    store.photoCount * pricing.attaToNas.photo +
-    store.recheckCount * pricing.attaToNas.recheck
+    store.photoCount * (store.directPhotoCostPerUnit ?? pricing.attaToNas.photo) +
+    store.recheckCount * (store.directRecheckCostPerUnit ?? pricing.attaToNas.recheck)
   );
 }
 
@@ -123,15 +95,8 @@ export function calculateAttaDirectCost(store: Store, pricing: Pricing) {
 }
 
 export function calculateDirectPhotoStaffCost(store: Store) {
-  if (
-    store.managedByNas ||
-    !store.directPhotoConversionRate ||
-    !store.directPhotoBaseActualUnits ||
-    !store.directPhotoBaseCompensation
-  ) return 0;
-  const convertedUnits = store.photoCount * store.directPhotoConversionRate;
-  const baseConvertedUnits = store.directPhotoBaseActualUnits * store.directPhotoConversionRate;
-  return convertedUnits * (store.directPhotoBaseCompensation / baseConvertedUnits);
+  if (store.managedByNas) return 0;
+  return store.photoCount * (store.directPhotoCostPerUnit ?? 0);
 }
 
 export function calculateAttaGrossProfit(store: Store, settings: SimulationSettings) {
@@ -146,8 +111,8 @@ export function calculateNasStaffCost(store: Store, pricing: Pricing) {
     normal * pricing.nasToWorker.normalFinishing +
     dirty * pricing.nasToWorker.dirtyFinishing +
     store.washCount * pricing.nasToWorker.wash +
-    store.photoCount * pricing.nasToWorker.photo +
-    store.recheckCount * pricing.nasToWorker.recheck
+    store.photoCount * (store.directPhotoCostPerUnit ?? pricing.nasToWorker.photo) +
+    store.recheckCount * (store.directRecheckCostPerUnit ?? pricing.nasToWorker.recheck)
   );
 }
 
@@ -157,20 +122,16 @@ export function calculateNasGrossProfit(store: Store, pricing: Pricing) {
 
 export function calculateStoreSimulation(store: Store, settings: SimulationSettings): StoreFinancials {
   const { simple, normal, dirty } = mixCounts(store);
-  const photoBundledNormal = store.billPhotoAsFinishingBundle === false ? 0 : Math.min(normal, store.photoCount);
   const normalFinishingPrice = store.clientNormalFinishingPrice ?? settings.pricing.client.normalFinishing;
   const finishingRevenue = store.actualMonthlyRevenue != null
     ? 0
     : simple * settings.pricing.client.simpleFinishing +
-      (normal - photoBundledNormal) * normalFinishingPrice +
-      photoBundledNormal * settings.pricing.client.normalFinishingWithPhoto +
+      normal * normalFinishingPrice +
       dirty * settings.pricing.client.dirtyFinishing;
   const washRevenue = store.actualMonthlyRevenue != null ? 0 : store.washCount * settings.pricing.client.wash;
   const taxMultiplier = settings.taxMode === "taxIncluded" ? 1 + settings.taxRate : 1;
   const recheckRevenue = store.actualMonthlyRevenue != null ? 0 : calculateRecheckRevenue(
     store.recheckCount,
-    store.recheckSlots,
-    settings.recheckConversionRate,
     settings.pricing.client,
     taxMultiplier,
   );

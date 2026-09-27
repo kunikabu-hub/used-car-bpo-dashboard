@@ -23,9 +23,6 @@ export type Store = {
   dirtyFinishingCount?: number;
   washCount: number;
   photoCount: number;
-  billPhotoAsFinishingBundle?: boolean;
-  photoContractConversionRate?: number;
-  photoContractAdjustmentUnitPrice?: number;
   recheckCount: number;
   recheckWorkers: number;
   recheckSlots: number;
@@ -33,9 +30,7 @@ export type Store = {
   actualDirectCost?: number;
   clientNormalFinishingPrice?: number;
   directFinishingCostPerUnit?: number;
-  directPhotoConversionRate?: number;
-  directPhotoBaseActualUnits?: number;
-  directPhotoBaseCompensation?: number;
+  directPhotoCostPerUnit?: number;
   directWashCostPerUnit?: number;
   directRecheckCostPerUnit?: number;
   starterKitInstalled: boolean;
@@ -51,13 +46,9 @@ export type Pricing = {
     normalFinishing: number;
     dirtyFinishing: number;
     deliveryFinishing: number;
-    normalFinishingWithPhoto: number;
     wash: number;
-    recheckBaseMonthlyFee: number;
-    recheckBaseUnits: number;
-    recheckLowerUnits: number;
-    recheckUpperUnits: number;
-    recheckAdjustmentUnitPrice: number;
+    photo: number;
+    recheck: number;
   };
   attaToNas: {
     simpleFinishing: number;
@@ -86,7 +77,6 @@ export type OperatingCostSettings = {
 export type SimulationSettings = {
   taxMode: TaxMode;
   taxRate: number;
-  recheckConversionRate: number;
   operatingDays: number;
   pricing: Pricing;
   operatingCosts: OperatingCostSettings;

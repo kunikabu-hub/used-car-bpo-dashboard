@@ -20,29 +20,15 @@ import {
 const settings = {
   taxMode: "taxExclusive",
   taxRate: 0.1,
-  recheckConversionRate: 0.75,
   operatingDays: 22,
   pricing,
   operatingCosts: operatingCostSettings,
 };
 
-const recheck = (units, rate = 1, slots = 1) => calculateRecheckRevenue(units, slots, rate, pricing.client);
-
-test("換算台数の固定レンジ境界を計算する", () => {
-  assert.ok(Math.abs(recheck(99) - (370000 - 3083.333333)) < 0.01);
-  assert.equal(recheck(100), 370000);
-  assert.equal(recheck(120), 370000);
-  assert.equal(recheck(140), 370000);
-  assert.ok(Math.abs(recheck(141) - (370000 + 3083.333333)) < 0.01);
-});
-
-test("2枠200実台を枠別に0.75換算する", () => {
-  const expectedPerSlot = 370000 - (100 - 75) * 3083.333333;
-  assert.ok(Math.abs(recheck(200, 0.75, 2) - expectedPerSlot * 2) < 0.01);
-});
-
-test("0.70と0.75換算を比較できる", () => {
-  assert.ok(recheck(70, 0.75) > recheck(70, 0.70));
+test("リチェック＋登録は実台数×2,500円で請求する", () => {
+  assert.equal(calculateRecheckRevenue(1, pricing.client), 2_500);
+  assert.equal(calculateRecheckRevenue(100, pricing.client), 250_000);
+  assert.equal(calculateRecheckRevenue(100, pricing.client, 1.1), 275_000);
 });
 
 test("八王子は実績固定値を優先する", () => {
@@ -53,24 +39,24 @@ test("八王子は実績固定値を優先する", () => {
   assert.equal(result.nasRevenue, 0);
 });
 
-test("一宮はリチェックなし、撮影150台を75台分へ換算する", () => {
+test("一宮はリチェックなし、撮影150台を2,000円で請求する", () => {
   const result = calculateStoreSimulation(stores[1], settings);
   assert.equal(stores[1].recheckCount, 0);
   assert.equal(stores[1].recheckSlots, 0);
   assert.equal(result.recheckRevenue, 0);
-  assert.equal(calculatePhotoContractRevenue(stores[1], settings), 292925);
-  assert.equal(result.photoContractRevenue, 292925);
+  assert.equal(calculatePhotoContractRevenue(stores[1], settings), 300_000);
+  assert.equal(result.photoContractRevenue, 300_000);
 });
 
-test("一宮は仕上げ180台・撮影150台、撮影専任報酬17万円で計算する", () => {
+test("一宮は仕上げ180台・撮影150台、撮影委託費1,500円で計算する", () => {
   const result = calculateStoreSimulation(stores[1], settings);
   assert.equal(stores[1].finishingCount, 180);
   assert.equal(stores[1].photoCount, 150);
-  assert.equal(calculateDirectPhotoStaffCost(stores[1]), 170000);
+  assert.equal(calculateDirectPhotoStaffCost(stores[1]), 225_000);
   assert.equal(stores[1].clientNormalFinishingPrice, 7500);
-  assert.equal(result.attaRevenue, 1860890);
-  assert.equal(result.attaDirectCost, 941186);
-  assert.equal(result.attaGrossProfit, 919704);
+  assert.equal(result.attaRevenue, 1_867_965);
+  assert.equal(result.attaDirectCost, 996_186);
+  assert.equal(result.attaGrossProfit, 871_779);
 });
 
 test("6店舗のMAX展示数を反映する", () => {
@@ -92,8 +78,8 @@ test("NaSは草加・大宮・つくば、新狭山はLIVE COLOR管理", () => {
   assert.equal(shinsayama?.washCount, 0);
   assert.equal(shinsayama?.directFinishingCostPerUnit, 5500);
   assert.equal(shinsayama?.directRecheckCostPerUnit, 2500);
-  assert.equal(result.attaDirectCost, 1620000);
-  assert.ok(Math.abs(result.attaGrossProfit - 899583.333345) < 0.01);
+  assert.equal(result.attaDirectCost, 1_710_000);
+  assert.equal(result.attaGrossProfit, 684_000);
   assert.equal(result.nasSupplyCost, 0);
 });
 
@@ -104,8 +90,8 @@ test("つくばは展示150台のNaS管理、当面は撮影なし", () => {
   assert.equal(tsukuba?.finishingCount, 150);
   assert.equal(tsukuba?.photoCount, 0);
   assert.equal(tsukuba?.starterKitInstalled, false);
-  assert.equal(result.nasRevenue, 905000);
-  assert.equal(result.nasStaffCost, 575000);
+  assert.equal(result.nasRevenue, 940_000);
+  assert.equal(result.nasStaffCost, 610_000);
   assert.equal(result.nasSupplyCost, 30000);
   assert.equal(result.nasContributionProfit, 300000);
 });
@@ -118,10 +104,19 @@ test("大宮は展示車両水洗いを収益・原価に含めない", () => {
   assert.equal(result.washRevenue, 0);
   assert.equal(
     result.nasRevenue,
-    omiya.normalFinishingCount * pricing.attaToNas.normalFinishing +
+      omiya.normalFinishingCount * pricing.attaToNas.normalFinishing +
       omiya.photoCount * pricing.attaToNas.photo +
-      omiya.recheckCount * pricing.attaToNas.recheck,
+      omiya.recheckCount * omiya.directRecheckCostPerUnit,
   );
+});
+
+test("撮影・リチェックは新しい請求単価と委託単価を使う", () => {
+  assert.equal(pricing.client.photo, 2_000);
+  assert.equal(pricing.client.recheck, 2_500);
+  assert.equal(pricing.attaToNas.photo, 1_500);
+  assert.equal(pricing.attaToNas.recheck, 2_000);
+  assert.equal(stores.find((store) => store.id === "omiya")?.directRecheckCostPerUnit, 2_500);
+  assert.equal(stores.find((store) => store.id === "tsukuba")?.directRecheckCostPerUnit, 2_500);
 });
 
 test("追加5店舗の初期投資とNaS用具費を計算する", () => {
